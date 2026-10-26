@@ -4,7 +4,7 @@ import base64
 import hashlib
 import json
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, Any
 from uuid import UUID
 
 from cryptography.fernet import Fernet, InvalidToken
@@ -46,6 +46,8 @@ class SlotTokenCodec:
         slot_end: Optional[datetime],
         contract_version: str,
         expires_at: datetime,
+        applied_filters: Optional[dict[str, Any]] = None,
+        is_estimated: bool = False,
     ) -> SlotToken:
         """
         Genera y cifra el token de oferta produciendo un SlotToken válido con raw_token.
@@ -59,6 +61,8 @@ class SlotTokenCodec:
             "slot_end": slot_end.isoformat() if slot_end else None,
             "contract_version": contract_version,
             "expires_at": expires_at.isoformat(),
+            "applied_filters": applied_filters or {},
+            "is_estimated": is_estimated,
         }
         serialized = json.dumps(payload, separators=(",", ":"), ensure_ascii=True)
         raw_token = self._fernet.encrypt(serialized.encode("utf-8")).decode("utf-8")
@@ -73,6 +77,8 @@ class SlotTokenCodec:
             contract_version=contract_version,
             expires_at=expires_at,
             raw_token=raw_token,
+            applied_filters=applied_filters or {},
+            is_estimated=is_estimated,
         )
 
     def decode(self, raw_token: str, now: Optional[datetime] = None) -> SlotToken:
@@ -104,6 +110,8 @@ class SlotTokenCodec:
             )
             contract_version = str(payload["contract_version"])
             expires_at = datetime.fromisoformat(payload["expires_at"])
+            applied_filters = payload.get("applied_filters", {})
+            is_estimated = bool(payload.get("is_estimated", False))
         except (KeyError, ValueError, TypeError) as e:
             raise SlotTokenInvalidException(f"Estructura interna de token corrupta: {str(e)}")
 
@@ -123,6 +131,8 @@ class SlotTokenCodec:
             contract_version=contract_version,
             expires_at=expires_at,
             raw_token=raw_token,
+            applied_filters=applied_filters,
+            is_estimated=is_estimated,
         )
 
     def verify_for_user(self, token: SlotToken, expected_user_uuid: UUID) -> None:

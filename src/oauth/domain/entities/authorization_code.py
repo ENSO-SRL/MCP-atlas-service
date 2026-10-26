@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from uuid import UUID, uuid4
 
@@ -20,7 +20,9 @@ class AuthorizationCode(Entity[str]):
     redirect_uri: str = ""
     scope: str = "bookings:read bookings:write profile"
     challenge: PKCEChallenge = field(default_factory=lambda: PKCEChallenge("dummy"))
-    expires_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    expires_at: datetime = field(
+        default_factory=lambda: datetime.now(timezone.utc) + timedelta(minutes=10)
+    )
     used_at: Optional[datetime] = None
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 

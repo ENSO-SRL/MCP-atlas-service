@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Optional
 from uuid import UUID
 
 from src.shared.domain.base import ValueObject
@@ -24,6 +24,8 @@ class SlotToken(ValueObject):
     contract_version: str
     expires_at: datetime
     raw_token: str
+    applied_filters: dict[str, Any] = field(default_factory=dict)
+    is_estimated: bool = False
 
     def is_expired(self, now: Optional[datetime] = None) -> bool:
         current_time = now or datetime.now(timezone.utc)

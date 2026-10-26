@@ -135,6 +135,12 @@ class IRedisBusClient(ABC):
         pass
 
     @abstractmethod
+    async def publish_dimension_request(
+        self, operation_id: str, payload: dict[str, Any]
+    ) -> None:
+        pass
+
+    @abstractmethod
     async def wait_for_response(
         self, response_key: str, timeout_seconds: float
     ) -> Optional[dict[str, Any]]:
