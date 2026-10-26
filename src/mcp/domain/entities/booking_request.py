@@ -35,10 +35,10 @@ class BookingRequest(AggregateRoot[UUID]):
     status_reason: Optional[str] = None
     idempotency_key: str = ""
     request_fingerprint: str = ""
-    token_id: str = ""
-    offer_ref: str = ""
+    token_id: Optional[str] = None
+    offer_ref: Optional[str] = None
     hold_id: Optional[str] = None
-    slot_start: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    slot_start: Optional[datetime] = None
     slot_end: Optional[datetime] = None
     resource_ref: Optional[str] = None
     applied_filters: dict[str, Any] = field(default_factory=dict)
@@ -59,10 +59,10 @@ class BookingRequest(AggregateRoot[UUID]):
         contract_version_id: UUID,
         idempotency_key: str,
         request_fingerprint: str,
-        token_id: str,
-        offer_ref: str,
-        slot_start: datetime,
-        expires_at: datetime,
+        token_id: Optional[str] = None,
+        offer_ref: Optional[str] = None,
+        slot_start: Optional[datetime] = None,
+        expires_at: Optional[datetime] = None,
         hold_id: Optional[str] = None,
         slot_end: Optional[datetime] = None,
         resource_ref: Optional[str] = None,
@@ -70,6 +70,7 @@ class BookingRequest(AggregateRoot[UUID]):
         fields: Optional[dict[str, Any]] = None,
         price_estimate: Optional[PriceEstimate] = None,
     ) -> BookingRequest:
+        actual_expires_at = expires_at if expires_at is not None else datetime.now(timezone.utc)
         booking = cls(
             id=uuid4(),
             user_uuid=user_uuid,
@@ -87,7 +88,7 @@ class BookingRequest(AggregateRoot[UUID]):
             applied_filters=applied_filters or {},
             fields=fields or {},
             price_estimate=price_estimate,
-            expires_at=expires_at,
+            expires_at=actual_expires_at,
         )
         booking.record_event(
             BookingRequestedEvent(

@@ -46,8 +46,12 @@ def test_mcp_models_schema_and_columns():
     assert "idempotency_key" in booking_table.c
     assert "token_id" in booking_table.c
     assert "user_uuid" in booking_table.c
+    assert booking_table.c.token_id.nullable is True
+    assert booking_table.c.offer_ref.nullable is True
+    assert booking_table.c.slot_start.nullable is True
 
     contract_table = Base.metadata.tables["mcp.service_contract_version"]
     assert contract_table.schema == "mcp"
     assert "booking_fields_schema" in contract_table.c
     assert "status" in contract_table.c
+    assert "pattern" in contract_table.c

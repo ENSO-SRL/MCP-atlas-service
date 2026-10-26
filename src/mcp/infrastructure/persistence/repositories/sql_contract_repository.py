@@ -91,7 +91,7 @@ class SqlContractRepository(IContractRepository):
             service_id=model.service_id,
             version_no=model.version_no,
             status=ContractStatus(model.status),
-            pattern=AvailabilityPattern.SLOT_OBJECT,
+            pattern=AvailabilityPattern(model.pattern) if hasattr(model, "pattern") and model.pattern else AvailabilityPattern.SLOT_OBJECT,
             booking_fields_schema=model.booking_fields_schema or {},
             dimensions=domain_dimensions,
             payment_policy=model.payment_policy or {},

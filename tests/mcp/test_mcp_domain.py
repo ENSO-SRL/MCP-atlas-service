@@ -291,3 +291,37 @@ def test_establishment_rule_type_anticipation():
     assert est_tomorrow.is_date_allowed(today, reference_date=today) is True
     assert est_tomorrow.is_date_allowed(tomorrow, reference_date=today) is True
     assert est_tomorrow.is_date_allowed(today + timedelta(days=2), reference_date=today) is False
+
+
+def test_booking_request_on_demand_without_slot():
+    """Prueba que un servicio de veterinaria/on-demand puede crear reservas sin slot_start, token ni hold."""
+    user_uuid = uuid4()
+    booking = BookingRequest.create(
+        user_uuid=user_uuid,
+        service_id=205,
+        contract_version_id=uuid4(),
+        idempotency_key="ondemand_idemp_1",
+        request_fingerprint="fp_ondemand",
+        token_id=None,
+        offer_ref=None,
+        slot_start=None,
+        fields={
+            "urgency": "asap",
+            "pet_name": "Max",
+            "pet_type": "perro",
+            "reason": "Vacunación anual",
+        },
+    )
+    assert booking.status == BookingStatus.REQUESTED
+    assert booking.token_id is None
+    assert booking.offer_ref is None
+    assert booking.slot_start is None
+    assert booking.fields["pet_name"] == "Max"
+
+    events = booking.pull_domain_events()
+    assert len(events) == 1
+    assert events[0].booking_id == booking.id
+    assert events[0].offer_ref is None
+    assert events[0].slot_start is None
+
+    assert AvailabilityPattern.ON_DEMAND_REQUEST.value == "on_demand_request"

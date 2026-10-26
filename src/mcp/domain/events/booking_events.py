@@ -13,8 +13,8 @@ class BookingRequestedEvent(DomainEvent):
     booking_id: UUID = field(default_factory=uuid4)
     user_uuid: UUID = field(default_factory=uuid4)
     service_id: int = 0
-    offer_ref: str = ""
-    slot_start: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    offer_ref: Optional[str] = None
+    slot_start: Optional[datetime] = None
     fields: dict[str, Any] = field(default_factory=dict)
     expires_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 

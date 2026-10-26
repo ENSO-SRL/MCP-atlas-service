@@ -16,8 +16,9 @@ class BookingStatus(str, Enum):
 class AvailabilityPattern(str, Enum):
     """Patrón de disponibilidad del servicio."""
     SLOT_OBJECT = "slot_object"                 # Cancha, mesa, hoyos (objeto reservable)
-    APPOINTMENT_RESOURCE = "appointment_resource" # Taller mecánico, veterinaria (profesional/recurso)
+    APPOINTMENT_RESOURCE = "appointment_resource" # Taller mecánico (profesional/recurso con hora fija)
     SESSION_SEATS = "session_seats"               # Cine, teatro (butacas o aforo)
+    ON_DEMAND_REQUEST = "on_demand_request"       # Veterinaria, presupuestos, urgencias (sin slots fijos)
 
 
 class RuleType(str, Enum):

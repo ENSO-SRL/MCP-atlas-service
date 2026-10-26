@@ -37,6 +37,7 @@ class ServiceContractVersionModel(Base):
     service_id: Mapped[int] = mapped_column(Integer, ForeignKey("servicios.id"), nullable=False)
     version_no: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="draft", nullable=False)
+    pattern: Mapped[str] = mapped_column(String(30), default="slot_object", nullable=False)
     booking_fields_schema: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
     payment_policy: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
     cancellation_policy: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)

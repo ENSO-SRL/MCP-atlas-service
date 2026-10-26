@@ -20,6 +20,8 @@ CREATE TABLE IF NOT EXISTS mcp.service_contract_version (
     version_no             integer NOT NULL DEFAULT 1,
     status                 text NOT NULL DEFAULT 'draft'
                            CHECK (status IN ('draft', 'published', 'retired')),
+    pattern                text NOT NULL DEFAULT 'slot_object'
+                           CHECK (pattern IN ('slot_object', 'appointment_resource', 'session_seats', 'on_demand_request')),
     booking_fields_schema  jsonb NOT NULL DEFAULT '{}'::jsonb,
     payment_policy         jsonb NOT NULL DEFAULT '{}'::jsonb,
     cancellation_policy    jsonb NOT NULL DEFAULT '{}'::jsonb,
@@ -146,10 +148,10 @@ CREATE TABLE IF NOT EXISTS mcp.booking_request (
     status_reason        text,
     idempotency_key      text NOT NULL,
     request_fingerprint  text NOT NULL,
-    token_id             text NOT NULL UNIQUE,
-    offer_ref            text NOT NULL,
+    token_id             text UNIQUE,
+    offer_ref            text,
     hold_id              text,
-    slot_start           timestamptz NOT NULL,
+    slot_start           timestamptz,
     slot_end             timestamptz,
     resource_ref         text,
     applied_filters      jsonb NOT NULL DEFAULT '{}'::jsonb,
@@ -163,7 +165,7 @@ CREATE TABLE IF NOT EXISTS mcp.booking_request (
     created_at           timestamptz NOT NULL DEFAULT now(),
     updated_at           timestamptz NOT NULL DEFAULT now(),
     UNIQUE (user_uuid, idempotency_key),
-    CHECK (slot_end IS NULL OR slot_end > slot_start)
+    CHECK (slot_end IS NULL OR slot_start IS NULL OR slot_end > slot_start)
 );
 
 CREATE INDEX IF NOT EXISTS ix_booking_user_created
