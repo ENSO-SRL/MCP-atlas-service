@@ -15,7 +15,7 @@ COMMENT ON SCHEMA mcp IS 'Tablas dedicadas del Conector MCP de Atlas: contratos 
 -- =====================================================================
 
 CREATE TABLE IF NOT EXISTS mcp.service_contract_version (
-    id                     uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    id                     uuid PRIMARY KEY,
     service_id             integer NOT NULL REFERENCES public.servicios (id) ON DELETE RESTRICT,
     version_no             integer NOT NULL DEFAULT 1,
     status                 text NOT NULL DEFAULT 'draft'
@@ -38,7 +38,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_contract_one_published_per_service
     WHERE status = 'published';
 
 CREATE TABLE IF NOT EXISTS mcp.contract_dimension (
-    id                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    id                   uuid PRIMARY KEY,
     contract_version_id  uuid NOT NULL REFERENCES mcp.service_contract_version (id) ON DELETE CASCADE,
     key                  text NOT NULL,
     position             smallint NOT NULL DEFAULT 0,
@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS mcp.contract_dimension_dependency (
 );
 
 CREATE TABLE IF NOT EXISTS mcp.contract_dimension_value (
-    id                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    id                   uuid PRIMARY KEY,
     contract_version_id  uuid NOT NULL,
     dimension_id         uuid NOT NULL,
     value_key            text NOT NULL,
@@ -100,7 +100,7 @@ CREATE TABLE IF NOT EXISTS mcp.service_pricing_policy (
 );
 
 CREATE TABLE IF NOT EXISTS mcp.service_price_rule (
-    id                    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    id                    uuid PRIMARY KEY,
     service_id            integer NOT NULL
                           REFERENCES mcp.service_pricing_policy (service_id) ON DELETE RESTRICT,
     label                 text NOT NULL,
@@ -136,7 +136,7 @@ CREATE INDEX IF NOT EXISTS ix_price_rule_lookup
 -- =====================================================================
 
 CREATE TABLE IF NOT EXISTS mcp.booking_request (
-    id                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    id                   uuid PRIMARY KEY,
     user_uuid            uuid NOT NULL, -- Corresponde a public.users.uuid
     service_id           integer NOT NULL REFERENCES public.servicios (id) ON DELETE RESTRICT,
     contract_version_id  uuid NOT NULL REFERENCES mcp.service_contract_version (id) ON DELETE RESTRICT,
