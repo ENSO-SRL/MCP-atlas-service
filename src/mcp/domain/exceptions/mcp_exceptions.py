@@ -6,6 +6,11 @@ class McpDomainException(Exception):
     pass
 
 
+class EntityNotFoundException(McpDomainException):
+    def __init__(self, message: str = "Entidad no encontrada."):
+        super().__init__(message)
+
+
 class InvalidStateTransitionException(McpDomainException):
     def __init__(self, current_status: BookingStatus, target_status: BookingStatus):
         super().__init__(

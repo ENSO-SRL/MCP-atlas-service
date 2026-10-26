@@ -72,6 +72,10 @@ class RedisDimensionOptionsCache:
         self._default_ttl = get_settings().REDIS_DIMENSION_CACHE_TTL
 
     @staticmethod
+    def compute_context_hash(context: dict[str, Any]) -> str:
+        return compute_context_hash(context)
+
+    @staticmethod
     def build_key(service_id: int, dimension_key: str, context: dict[str, Any]) -> str:
         context_hash = compute_context_hash(context)
         return f"dim:cache:{service_id}:{dimension_key}:{context_hash}"

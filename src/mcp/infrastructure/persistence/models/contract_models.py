@@ -4,6 +4,9 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Optional
 from uuid import UUID, uuid4
+from datetime import timezone
+
+
 
 from sqlalchemy import (
     ARRAY,
