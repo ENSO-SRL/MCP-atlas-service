@@ -34,7 +34,7 @@ class ServiceContractVersionModel(Base):
     )
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
-    service_id: Mapped[int] = mapped_column(Integer, ForeignKey("public.servicios.id"), nullable=False)
+    service_id: Mapped[int] = mapped_column(Integer, ForeignKey("servicios.id"), nullable=False)
     version_no: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="draft", nullable=False)
     booking_fields_schema: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
@@ -134,7 +134,7 @@ class ServicePricingPolicyModel(Base):
     __tablename__ = "service_pricing_policy"
     __table_args__ = {"schema": "mcp"}
 
-    service_id: Mapped[int] = mapped_column(Integer, ForeignKey("public.servicios.id"), primary_key=True)
+    service_id: Mapped[int] = mapped_column(Integer, ForeignKey("servicios.id"), primary_key=True)
     pricing_mode: Mapped[str] = mapped_column(String(20), nullable=False)
     currency: Mapped[Optional[str]] = mapped_column(String(3), nullable=True)
     tax_included: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)

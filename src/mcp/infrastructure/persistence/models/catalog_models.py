@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, time
+from datetime import datetime, time, timezone
 from typing import Any, Optional
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, Time
@@ -18,8 +18,8 @@ class EstablishmentCategoryModel(Base):
     name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     description: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     establishments: Mapped[list[EstablishmentModel]] = relationship(back_populates="category")
 
@@ -57,8 +57,8 @@ class EstablishmentModel(Base):
     postal_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     reference: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     google_maps_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     category: Mapped[Optional[EstablishmentCategoryModel]] = relationship(back_populates="establishments")
     servicios: Mapped[list[ServicioModel]] = relationship(back_populates="establishment")
@@ -72,8 +72,8 @@ class CategoriaServicioModel(Base):
     nombre: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     descripcion: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     activo: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     servicios: Mapped[list[ServicioModel]] = relationship(back_populates="categoria")
 
@@ -104,8 +104,8 @@ class ServicioModel(Base):
     postal_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     reference: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     google_maps_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     establishment: Mapped[EstablishmentModel] = relationship(back_populates="servicios")
     categoria: Mapped[CategoriaServicioModel] = relationship(back_populates="servicios")

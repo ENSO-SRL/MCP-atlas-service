@@ -29,7 +29,7 @@ class BookingRequestModel(Base):
 
     id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
     user_uuid: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
-    service_id: Mapped[int] = mapped_column(Integer, ForeignKey("public.servicios.id"), nullable=False)
+    service_id: Mapped[int] = mapped_column(Integer, ForeignKey("servicios.id"), nullable=False)
     contract_version_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("mcp.service_contract_version.id"), nullable=False
     )
