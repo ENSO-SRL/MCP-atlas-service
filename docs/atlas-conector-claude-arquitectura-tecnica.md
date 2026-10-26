@@ -237,15 +237,35 @@ sequenceDiagram
             M->>P: UPDATE outbox_event SET published_at = now()
             
             R->>F: Facade consume BookingRequested
-            F->>S: Solicita reserva al club
-            S-->>F: Confirmación del club
-            F->>R: XADD stream:booking:results (BookingConfirmed)
-            
-            Note over M,P: Inbox Worker en Background
-            M->>R: Consume BookingConfirmed
-            M->>P: INSERT INTO inbox_event (event_id) ON CONFLICT DO NOTHING
-            M->>P: UPDATE booking_request SET status = 'confirmed'
-            M->>P: INSERT INTO booking_status_history (...)
+            F->>S: Solicita reserva al ejecutor/sede
+
+            alt Caso Mayoritario: Procesamiento Inmediato
+                S-->>F: Confirmación o rechazo directo del club
+                F->>R: XADD stream:booking:results (BookingConfirmed / BookingRejected)
+                
+                Note over M,P: Inbox Worker en Background
+                M->>R: Consume resultado conclusivo
+                M->>P: INSERT INTO inbox_event (event_id) ON CONFLICT DO NOTHING
+                M->>P: UPDATE booking_request SET status = 'confirmed' / 'rejected'
+                M->>P: INSERT INTO booking_status_history (...)
+            else Caso Trámite Diferido: Aceptación Inicial (Estado 'accepted')
+                S-->>F: Solicitud recibida y en trámite (requiere validación manual o tiempo de gestión)
+                F->>R: XADD stream:booking:results (BookingAccepted)
+                
+                Note over M,P: Inbox Worker en Background
+                M->>R: Consume BookingAccepted
+                M->>P: INSERT INTO inbox_event (event_id) ON CONFLICT DO NOTHING
+                M->>P: UPDATE booking_request SET status = 'accepted'
+                M->>P: INSERT INTO booking_status_history (...)
+                Note over C,M: get_booking_status retorna 'accepted' ("En trámite por la sede")
+                
+                Note over F,S: Minutos más tarde...
+                S-->>F: Resolución definitiva de la sede
+                F->>R: XADD stream:booking:results (BookingConfirmed / BookingRejected)
+                M->>R: Consume resultado definitivo
+                M->>P: UPDATE booking_request SET status = 'confirmed' / 'rejected'
+                M->>P: INSERT INTO booking_status_history (...)
+            end
         end
     end
 ```
@@ -258,27 +278,41 @@ sequenceDiagram
   ┌──────────────────────────────────────────────────────────────┐
   │                         (nueva)                              │
   └────────────────────────────┬─────────────────────────────────┘
-                               │ create_booking_request aceptado
+                               │ create_booking_request
                                ▼
   ┌──────────────────────────────────────────────────────────────┐
   │                        requested                             │
   └───┬─────────────┬─────────────┬─────────────┬────────────┬───┘
       │             │             │             │            │
-      │ Confirmed   │ Rejected    │ Failed      │ Expired    │ cancel_booking
-      ▼             ▼             ▼             ▼            ▼
-┌───────────┐ ┌───────────┐ ┌───────────┐ ┌───────────┐ ┌────────────────┐
-│ confirmed │ │ rejected  │ │  failed   │ │  expired  │ │cancel_requested│
-└─────┬─────┘ └───────────┘ └───────────┘ └─────┬─────┘ └───────┬────────┘
-      │                                         │               │
-      │ cancel_booking                          │ Confirmación  │ CancellationConfirmed
-      │                                         │ tardía        │
-      ▼                                         ▼               ▼
-┌────────────────┐                        ┌───────────┐   ┌────────────┐
-│cancel_requested│                        │ confirmed │   │ cancelled  │
-└────────────────┘                        └───────────┘   └────────────┘
+      │ Accepted    │ Confirmed   │ Rejected    │ Failed     │ Expired / cancel
+      ▼             │ (directo)   │             │            │
+┌───────────┐       │             │             │            │
+│ accepted  │       │             │             │            │
+└───┬───────┘       │             │             │            │
+    │               │             │             │            │
+    ├───────────────┼─────────────┴─────────────┴────────────┘
+    │               ▼
+    │         ┌───────────┐ ┌───────────┐ ┌───────────┐ ┌───────────┐ ┌────────────────┐
+    │         │ confirmed │ │ rejected  │ │  failed   │ │  expired  │ │cancel_requested│
+    │         └─────┬─────┘ └───────────┘ └───────────┘ └─────┬─────┘ └───────┬────────┘
+    │               │                                         │               │
+    │               │ cancel_booking                          │ Confirmación  │ CancellationConfirmed
+    │               │                                         │ tardía        │
+    │               ▼                                         ▼               ▼
+    │         ┌────────────────┐                        ┌───────────┐   ┌────────────┐
+    │         │cancel_requested│                        │ confirmed │   │ cancelled  │
+    │         └────────────────┘                        └───────────┘   └────────────┘
+    ▼
+ (Mismas transiciones hacia confirmed, rejected, failed, expired, cancel_requested)
 ```
 
-> **Regla de confirmación tardía:** Si una solicitud pasa a `expired` por tiempo, pero el establecimiento confirma más tarde, la confirmación manda (`expired` $\to$ `confirmed`), ya que el negocio físico es la fuente de verdad.
+#### Descripción Semántica del Estado `accepted`:
+* **Significado:** El ejecutor conectado al Facade o sistema de la sede física ha aceptado la solicitud y la ha colocado en su pipeline interno de tramitación, pero aún no emite la confirmación concluyente (por ejemplo, validación de membresía, asignación manual de pista o cola de procesamiento del establecimiento).
+* **Comportamiento hacia Claude / Usuario:** Si `get_booking_status` o `create_booking_request` devuelven `status: "accepted"`, Claude debe informar claramente al usuario:
+  > *"Tu reserva ha sido recibida y aceptada por el establecimiento; actualmente se encuentra en trámite. Te informaremos tan pronto la sede emita la confirmación o puedes consultar nuevamente más adelante."*
+* **Cancelación en Trámite:** El usuario tiene permitido invocar `cancel_booking` mientras la solicitud esté en `accepted` (pasa a `cancel_requested`).
+* **Vencimiento en Trámite:** El temporizador `expires_at` se mantiene activo durante el estado `accepted`. Si no se recibe respuesta concluyente antes del TTL estipulado, pasa a `expired`.
+* **Regla de confirmación tardía:** Si una solicitud pasa a `expired` por tiempo (viniendo de `requested` o `accepted`), pero el establecimiento confirma más tarde, la confirmación manda (`expired` $\to$ `confirmed`), ya que el negocio físico es la fuente de verdad inmutable.
 
 ---
 

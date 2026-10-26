@@ -141,7 +141,7 @@ CREATE TABLE IF NOT EXISTS mcp.booking_request (
     service_id           integer NOT NULL REFERENCES public.servicios (id) ON DELETE RESTRICT,
     contract_version_id  uuid NOT NULL REFERENCES mcp.service_contract_version (id) ON DELETE RESTRICT,
     status               text NOT NULL DEFAULT 'requested'
-                         CHECK (status IN ('requested', 'confirmed', 'rejected', 'failed',
+                         CHECK (status IN ('requested', 'accepted', 'confirmed', 'rejected', 'failed',
                                            'expired', 'cancel_requested', 'cancelled')),
     status_reason        text,
     idempotency_key      text NOT NULL,
@@ -171,7 +171,7 @@ CREATE INDEX IF NOT EXISTS ix_booking_user_created
 
 CREATE INDEX IF NOT EXISTS ix_booking_expiry
     ON mcp.booking_request (expires_at)
-    WHERE status = 'requested';
+    WHERE status IN ('requested', 'accepted');
 
 CREATE INDEX IF NOT EXISTS ix_booking_service_slot
     ON mcp.booking_request (service_id, slot_start);

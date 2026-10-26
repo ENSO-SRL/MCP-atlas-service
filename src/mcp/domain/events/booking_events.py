@@ -20,6 +20,13 @@ class BookingRequestedEvent(DomainEvent):
 
 
 @dataclass
+class BookingAcceptedEvent(DomainEvent):
+    booking_id: UUID = field(default_factory=uuid4)
+    external_ref: Optional[str] = None
+    details: Optional[dict[str, Any]] = None
+
+
+@dataclass
 class BookingConfirmedEvent(DomainEvent):
     booking_id: UUID = field(default_factory=uuid4)
     external_ref: str = ""

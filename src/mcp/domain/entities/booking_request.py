@@ -7,6 +7,7 @@ from uuid import UUID, uuid4
 
 from src.mcp.domain.enums.mcp_enums import BookingStatus
 from src.mcp.domain.events.booking_events import (
+    BookingAcceptedEvent,
     BookingConfirmedEvent,
     BookingExpiredEvent,
     BookingFailedEvent,
@@ -101,11 +102,34 @@ class BookingRequest(AggregateRoot[UUID]):
         )
         return booking
 
+    def accept(self, external_ref: Optional[str] = None, assigned_details: Optional[dict[str, Any]] = None) -> None:
+        """
+        Marca la solicitud como aceptada en trámite por el ejecutor/establecimiento,
+        pendiente de confirmación o rechazo definitivo.
+        """
+        if self.status != BookingStatus.REQUESTED:
+            raise InvalidStateTransitionException(self.status, BookingStatus.ACCEPTED)
+
+        self.status = BookingStatus.ACCEPTED
+        if external_ref:
+            self.external_ref = external_ref
+        if assigned_details:
+            self.assigned_details = assigned_details
+        self.updated_at = datetime.now(timezone.utc)
+        self.version += 1
+        self.record_event(
+            BookingAcceptedEvent(
+                booking_id=self.id,
+                external_ref=external_ref,
+                details=assigned_details,
+            )
+        )
+
     def confirm(self, external_ref: str, assigned_details: Optional[dict[str, Any]] = None) -> None:
         """
-        Confirma la reserva. Se permite desde REQUESTED o desde EXPIRED (confirmación tardía).
+        Confirma la reserva. Se permite desde REQUESTED, ACCEPTED o desde EXPIRED (confirmación tardía).
         """
-        if self.status not in (BookingStatus.REQUESTED, BookingStatus.EXPIRED):
+        if self.status not in (BookingStatus.REQUESTED, BookingStatus.ACCEPTED, BookingStatus.EXPIRED):
             raise InvalidStateTransitionException(self.status, BookingStatus.CONFIRMED)
 
         self.status = BookingStatus.CONFIRMED
@@ -122,7 +146,7 @@ class BookingRequest(AggregateRoot[UUID]):
         )
 
     def reject(self, reason: str) -> None:
-        if self.status != BookingStatus.REQUESTED:
+        if self.status not in (BookingStatus.REQUESTED, BookingStatus.ACCEPTED):
             raise InvalidStateTransitionException(self.status, BookingStatus.REJECTED)
 
         self.status = BookingStatus.REJECTED
@@ -132,7 +156,7 @@ class BookingRequest(AggregateRoot[UUID]):
         self.record_event(BookingRejectedEvent(booking_id=self.id, reason=reason))
 
     def fail(self, reason: str) -> None:
-        if self.status != BookingStatus.REQUESTED:
+        if self.status not in (BookingStatus.REQUESTED, BookingStatus.ACCEPTED):
             raise InvalidStateTransitionException(self.status, BookingStatus.FAILED)
 
         self.status = BookingStatus.FAILED
@@ -142,7 +166,7 @@ class BookingRequest(AggregateRoot[UUID]):
         self.record_event(BookingFailedEvent(booking_id=self.id, reason=reason))
 
     def expire(self) -> None:
-        if self.status != BookingStatus.REQUESTED:
+        if self.status not in (BookingStatus.REQUESTED, BookingStatus.ACCEPTED):
             raise InvalidStateTransitionException(self.status, BookingStatus.EXPIRED)
 
         self.status = BookingStatus.EXPIRED
@@ -152,7 +176,7 @@ class BookingRequest(AggregateRoot[UUID]):
         self.record_event(BookingExpiredEvent(booking_id=self.id))
 
     def request_cancellation(self, reason: Optional[str] = None) -> None:
-        if self.status not in (BookingStatus.REQUESTED, BookingStatus.CONFIRMED):
+        if self.status not in (BookingStatus.REQUESTED, BookingStatus.ACCEPTED, BookingStatus.CONFIRMED):
             raise InvalidStateTransitionException(self.status, BookingStatus.CANCEL_REQUESTED)
 
         self.status = BookingStatus.CANCEL_REQUESTED

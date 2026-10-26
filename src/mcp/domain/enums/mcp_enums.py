@@ -4,6 +4,7 @@ from enum import Enum
 class BookingStatus(str, Enum):
     """Estados de la máquina de estados de solicitudes de reserva."""
     REQUESTED = "requested"
+    ACCEPTED = "accepted"
     CONFIRMED = "confirmed"
     REJECTED = "rejected"
     FAILED = "failed"

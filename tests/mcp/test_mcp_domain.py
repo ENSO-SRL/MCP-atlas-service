@@ -57,6 +57,123 @@ def test_booking_request_state_machine_happy_path():
     assert booking.status == BookingStatus.CANCELLED
 
 
+def test_booking_request_accepted_flow():
+    user_uuid = uuid4()
+    booking = BookingRequest.create(
+        user_uuid=user_uuid,
+        service_id=10,
+        contract_version_id=uuid4(),
+        idempotency_key="idemp_acc",
+        request_fingerprint="fp_acc",
+        token_id="tok_acc",
+        offer_ref="off_acc",
+        slot_start=datetime.now(timezone.utc),
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=15),
+    )
+    assert booking.status == BookingStatus.REQUESTED
+
+    # El ejecutor/facade acepta la solicitud en trámite
+    booking.accept(external_ref="TRAMITE-001", assigned_details={"proceso": "en_espera_de_sede"})
+    assert booking.status == BookingStatus.ACCEPTED
+    assert booking.external_ref == "TRAMITE-001"
+    events = booking.pull_domain_events()
+    assert len(events) == 2  # BookingRequestedEvent + BookingAcceptedEvent
+
+    # Finalmente la sede confirma concluyentemente
+    booking.confirm(external_ref="CONFIRM-FINAL-777", assigned_details={"cancha": "4"})
+    assert booking.status == BookingStatus.CONFIRMED
+    assert booking.external_ref == "CONFIRM-FINAL-777"
+
+
+def test_booking_request_accepted_to_cancelled_flow():
+    booking = BookingRequest.create(
+        user_uuid=uuid4(),
+        service_id=10,
+        contract_version_id=uuid4(),
+        idempotency_key="idemp_acc_cancel",
+        request_fingerprint="fp_acc_cancel",
+        token_id="tok_acc_cancel",
+        offer_ref="off_acc_cancel",
+        slot_start=datetime.now(timezone.utc),
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=15),
+    )
+    booking.accept(external_ref="TRAMITE-002")
+    assert booking.status == BookingStatus.ACCEPTED
+
+    # El usuario cancela mientras aún está en trámite (ACCEPTED)
+    booking.request_cancellation(reason="Demora en confirmación")
+    assert booking.status == BookingStatus.CANCEL_REQUESTED
+
+    booking.confirm_cancellation()
+    assert booking.status == BookingStatus.CANCELLED
+
+
+def test_booking_request_accepted_to_rejected_flow():
+    booking = BookingRequest.create(
+        user_uuid=uuid4(),
+        service_id=10,
+        contract_version_id=uuid4(),
+        idempotency_key="idemp_acc_rej",
+        request_fingerprint="fp_acc_rej",
+        token_id="tok_acc_rej",
+        offer_ref="off_acc_rej",
+        slot_start=datetime.now(timezone.utc),
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=15),
+    )
+    booking.accept(external_ref="TRAMITE-003")
+    assert booking.status == BookingStatus.ACCEPTED
+
+    # El negocio posteriormente rechaza tras trámite
+    booking.reject(reason="Conflicto de último minuto en sede")
+    assert booking.status == BookingStatus.REJECTED
+    assert booking.status_reason == "Conflicto de último minuto en sede"
+
+
+def test_booking_request_accepted_to_failed_flow():
+    booking = BookingRequest.create(
+        user_uuid=uuid4(),
+        service_id=10,
+        contract_version_id=uuid4(),
+        idempotency_key="idemp_acc_fail",
+        request_fingerprint="fp_acc_fail",
+        token_id="tok_acc_fail",
+        offer_ref="off_acc_fail",
+        slot_start=datetime.now(timezone.utc),
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=15),
+    )
+    booking.accept(external_ref="TRAMITE-004")
+    assert booking.status == BookingStatus.ACCEPTED
+
+    # Ocurre un fallo técnico upstream
+    booking.fail(reason="Error de comunicación con software de sede")
+    assert booking.status == BookingStatus.FAILED
+    assert booking.status_reason == "Error de comunicación con software de sede"
+
+
+def test_booking_request_accepted_to_expired_flow():
+    booking = BookingRequest.create(
+        user_uuid=uuid4(),
+        service_id=10,
+        contract_version_id=uuid4(),
+        idempotency_key="idemp_acc_exp",
+        request_fingerprint="fp_acc_exp",
+        token_id="tok_acc_exp",
+        offer_ref="off_acc_exp",
+        slot_start=datetime.now(timezone.utc),
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=15),
+    )
+    booking.accept(external_ref="TRAMITE-005")
+    assert booking.status == BookingStatus.ACCEPTED
+
+    # Expira el tiempo límite sin respuesta concluyente
+    booking.expire()
+    assert booking.status == BookingStatus.EXPIRED
+
+    # Puede confirmarse tarde si la sede responde a pesar de haber expirado
+    booking.confirm(external_ref="LATE-CONFIRM-888")
+    assert booking.status == BookingStatus.CONFIRMED
+
+
 def test_booking_request_late_confirmation_rule():
     # Si la solicitud venció (EXPIRED), pero el negocio confirma tarde, la confirmación manda
     booking = BookingRequest.create(

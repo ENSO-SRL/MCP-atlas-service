@@ -44,7 +44,7 @@ class ServiceContractVersionModel(Base):
     meta_schema_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     content_hash: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     published_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     dimensions: Mapped[list[ContractDimensionModel]] = relationship(
         back_populates="contract_version", cascade="all, delete-orphan"
