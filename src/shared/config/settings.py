@@ -34,6 +34,10 @@ class Settings(BaseSettings):
         default=600,
         description="TTL en segundos para la caché de disponibilidad de slots (5-10 min)",
     )
+    REDIS_DIMENSION_CACHE_TTL: int = Field(
+        default=600,
+        description="TTL en segundos para la caché de opciones de dimensión dependiente (5-10 min)",
+    )
     REDIS_SUPERFICIAL_WAIT_SECONDS: float = Field(
         default=2.0,
         description="Tiempo de espera superficial en segundos para consultas diferidas",
