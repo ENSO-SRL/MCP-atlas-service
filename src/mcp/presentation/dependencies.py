@@ -87,17 +87,17 @@ def build_mcp_use_cases(
         search_businesses=SearchBusinessesUseCase(est_repo),
         get_business_details=GetBusinessDetailsUseCase(est_repo, svc_repo, contract_repo),
         get_service_contract=GetServiceContractUseCase(svc_repo, contract_repo),
-        get_dimension_options=GetDimensionOptionsUseCase(contract_repo, dim_cache, bus_client),
+        get_dimension_options=GetDimensionOptionsUseCase(contract_repo, dim_cache, bus_client, catalog_repo=svc_repo),
         check_availability=CheckAvailabilityUseCase(
             est_repo, svc_repo, contract_repo, avail_cache, hold_manager, bus_client, token_codec
         ),
         get_operation_result=GetOperationResultUseCase(bus_client, hold_manager, token_codec, contract_repo),
         create_booking_request=CreateBookingRequestUseCase(
-            booking_repo, contract_repo, hold_manager, outbox_repo, token_codec
+            booking_repo, contract_repo, hold_manager, outbox_repo, token_codec, catalog_repo=svc_repo
         ),
         get_booking_status=GetBookingStatusUseCase(booking_repo, svc_repo, est_repo),
         list_my_bookings=ListMyBookingsUseCase(booking_repo, svc_repo),
-        cancel_booking=CancelBookingUseCase(booking_repo, outbox_repo),
+        cancel_booking=CancelBookingUseCase(booking_repo, outbox_repo, catalog_repo=svc_repo),
     )
 
 

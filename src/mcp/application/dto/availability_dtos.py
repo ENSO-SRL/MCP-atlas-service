@@ -18,6 +18,7 @@ class CheckAvailabilityQueryDTO:
     date_to: Optional[date] = None
     filters: dict[str, Any] = field(default_factory=dict)
     party_size: int = 1
+    user_phone: Optional[str] = None
 
 
 @dataclass

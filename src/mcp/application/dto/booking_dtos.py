@@ -14,6 +14,7 @@ class CreateBookingInputDTO:
     slot_token: Optional[str] = None
     service_id: Optional[int] = None  # Requerido si no hay slot_token (patrón on_demand_request)
     fields: dict[str, Any] = field(default_factory=dict)
+    user_phone: Optional[str] = None
 
 
 @dataclass
@@ -100,6 +101,7 @@ class CancelBookingInputDTO:
     booking_id: UUID
     user_uuid: UUID
     reason: Optional[str] = None
+    user_phone: Optional[str] = None
 
 
 @dataclass

@@ -195,12 +195,14 @@ def register_catalog_tools(server: MCPServer) -> None:
         context: Optional[dict[str, Any]] = None,
         ctx: Optional[Context] = None,
     ) -> dict[str, Any]:
-        extract_user_context(ctx, required_scope="bookings:read")
+        user = extract_user_context(ctx, required_scope="bookings:read")
 
         dto_query = GetDimensionOptionsQueryDTO(
             service_id=service_id,
             dimension_key=dimension_key,
             context=context or {},
+            user_uuid=user.user_uuid,
+            user_phone=user.phone_number,
         )
 
         async with get_mcp_use_cases() as uc:

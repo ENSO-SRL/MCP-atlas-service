@@ -42,14 +42,15 @@ def register_booking_tools(server: MCPServer) -> None:
         fields: Optional[dict[str, Any]] = None,
         ctx: Optional[Context] = None,
     ) -> dict[str, Any]:
-        user_uuid = extract_user_context(ctx, required_scope="bookings:write")
+        user = extract_user_context(ctx, required_scope="bookings:write")
 
         dto_input = CreateBookingInputDTO(
-            user_uuid=user_uuid,
+            user_uuid=user.user_uuid,
             idempotency_key=idempotency_key,
             slot_token=slot_token,
             service_id=service_id,
             fields=fields or {},
+            user_phone=user.phone_number,
         )
 
         async with get_mcp_use_cases() as uc:
@@ -85,14 +86,14 @@ def register_booking_tools(server: MCPServer) -> None:
         booking_id: str,
         ctx: Optional[Context] = None,
     ) -> dict[str, Any]:
-        user_uuid = extract_user_context(ctx, required_scope="bookings:read")
+        user = extract_user_context(ctx, required_scope="bookings:read")
 
         try:
             b_uuid = UUID(booking_id)
         except ValueError:
             raise ContractValidationException(f"El identificador 'booking_id' '{booking_id}' no es un UUID válido.")
 
-        dto_query = GetBookingStatusQueryDTO(booking_id=b_uuid, user_uuid=user_uuid)
+        dto_query = GetBookingStatusQueryDTO(booking_id=b_uuid, user_uuid=user.user_uuid)
 
         async with get_mcp_use_cases() as uc:
             res = await uc.get_booking_status.execute(dto_query)
@@ -136,10 +137,10 @@ def register_booking_tools(server: MCPServer) -> None:
         limit: int = 10,
         ctx: Optional[Context] = None,
     ) -> dict[str, Any]:
-        user_uuid = extract_user_context(ctx, required_scope="bookings:read")
+        user = extract_user_context(ctx, required_scope="bookings:read")
 
         dto_query = ListMyBookingsQueryDTO(
-            user_uuid=user_uuid,
+            user_uuid=user.user_uuid,
             status_filter=status_filter,
             cursor=cursor,
             limit=limit,
@@ -183,7 +184,7 @@ def register_booking_tools(server: MCPServer) -> None:
         reason: Optional[str] = None,
         ctx: Optional[Context] = None,
     ) -> dict[str, Any]:
-        user_uuid = extract_user_context(ctx, required_scope="bookings:write")
+        user = extract_user_context(ctx, required_scope="bookings:write")
 
         try:
             b_uuid = UUID(booking_id)
@@ -192,8 +193,9 @@ def register_booking_tools(server: MCPServer) -> None:
 
         dto_input = CancelBookingInputDTO(
             booking_id=b_uuid,
-            user_uuid=user_uuid,
+            user_uuid=user.user_uuid,
             reason=reason,
+            user_phone=user.phone_number,
         )
 
         async with get_mcp_use_cases() as uc:

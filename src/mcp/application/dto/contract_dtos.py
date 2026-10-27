@@ -55,6 +55,8 @@ class GetDimensionOptionsQueryDTO:
     service_id: int
     dimension_key: str
     context: dict[str, Any] = field(default_factory=dict)
+    user_uuid: Optional[UUID] = None
+    user_phone: Optional[str] = None
 
 
 @dataclass

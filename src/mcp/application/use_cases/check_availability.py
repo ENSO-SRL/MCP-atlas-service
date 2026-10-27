@@ -223,6 +223,9 @@ class CheckAvailabilityUseCase:
             operation_id = f"op_avail_{uuid4().hex[:12]}"
             bus_payload = {
                 "service_id": query.service_id,
+                "combo_code": svc.combo_code if svc else None,
+                "user_uuid": str(query.user_uuid),
+                "user_phone": query.user_phone,
                 "date_from": query.date_from.isoformat(),
                 "date_to": query.date_to.isoformat() if query.date_to else None,
                 "filters": query.filters,

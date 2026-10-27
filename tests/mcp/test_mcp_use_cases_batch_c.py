@@ -155,12 +155,18 @@ async def test_create_booking_happy_path_slot_based(
     mock_outbox_repo = MagicMock()
     mock_outbox_repo.record_event = AsyncMock()
 
+    mock_catalog_repo = MagicMock()
+    mock_svc = MagicMock()
+    mock_svc.combo_code = "PADEL_ORO"
+    mock_catalog_repo.get_by_id = AsyncMock(return_value=mock_svc)
+
     use_case = CreateBookingRequestUseCase(
         booking_repo=mock_booking_repo,
         contract_repo=mock_contract_repo,
         hold_manager=mock_hold_manager,
         outbox_repo=mock_outbox_repo,
         token_codec=mock_token_codec,
+        catalog_repo=mock_catalog_repo,
     )
 
     query = CreateBookingInputDTO(
@@ -168,6 +174,7 @@ async def test_create_booking_happy_path_slot_based(
         idempotency_key="idemp-key-101",
         slot_token=sample_slot_token_str,
         fields={"player_count": 4, "notes": "Traeremos pelotas nuevas"},
+        user_phone="+18095551234",
     )
 
     result = await use_case.execute(query)
@@ -191,6 +198,8 @@ async def test_create_booking_happy_path_slot_based(
     assert event_args["event_type"] == "BookingRequested"
     assert event_args["correlation_id"] == "idemp-key-101"
     assert event_args["payload"]["token_id"] == "tok-test-123"
+    assert event_args["payload"]["combo_code"] == "PADEL_ORO"
+    assert event_args["payload"]["user_phone"] == "+18095551234"
     assert event_args["payload"]["applied_filters"] == {"court_surface": "cristal", "indoor": True}
 
 
@@ -671,15 +680,22 @@ async def test_cancel_booking_happy_path(sample_user_uuid):
     mock_outbox_repo = MagicMock()
     mock_outbox_repo.record_event = AsyncMock()
 
+    mock_catalog_repo = MagicMock()
+    mock_svc = MagicMock()
+    mock_svc.combo_code = "PADEL_ORO"
+    mock_catalog_repo.get_by_id = AsyncMock(return_value=mock_svc)
+
     use_case = CancelBookingUseCase(
         booking_repo=mock_booking_repo,
         outbox_repo=mock_outbox_repo,
+        catalog_repo=mock_catalog_repo,
     )
 
     query = CancelBookingInputDTO(
         booking_id=booking_id,
         user_uuid=sample_user_uuid,
         reason="Imprevisto laboral, no podré asistir.",
+        user_phone="+18095551234",
     )
 
     result = await use_case.execute(query)
@@ -695,6 +711,8 @@ async def test_cancel_booking_happy_path(sample_user_uuid):
     event_args = mock_outbox_repo.record_event.call_args[1]
     assert event_args["event_type"] == "CancellationRequested"
     assert event_args["payload"]["reason"] == "Imprevisto laboral, no podré asistir."
+    assert event_args["payload"]["combo_code"] == "PADEL_ORO"
+    assert event_args["payload"]["user_phone"] == "+18095551234"
 
 
 @pytest.mark.asyncio

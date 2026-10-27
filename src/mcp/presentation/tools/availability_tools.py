@@ -41,7 +41,7 @@ def register_availability_tools(server: MCPServer) -> None:
         party_size: int = 1,
         ctx: Optional[Context] = None,
     ) -> dict[str, Any]:
-        user_uuid = extract_user_context(ctx, required_scope="bookings:read")
+        user = extract_user_context(ctx, required_scope="bookings:read")
 
         try:
             d_from = date.fromisoformat(date_from)
@@ -65,7 +65,8 @@ def register_availability_tools(server: MCPServer) -> None:
             date_to=d_to,
             filters=filters or {},
             party_size=party_size,
-            user_uuid=user_uuid,
+            user_uuid=user.user_uuid,
+            user_phone=user.phone_number,
         )
 
         async with get_mcp_use_cases() as uc:
@@ -118,11 +119,11 @@ def register_availability_tools(server: MCPServer) -> None:
         operation_id: str,
         ctx: Optional[Context] = None,
     ) -> dict[str, Any]:
-        user_uuid = extract_user_context(ctx, required_scope="bookings:read")
+        user = extract_user_context(ctx, required_scope="bookings:read")
 
         dto_query = GetOperationResultQueryDTO(
             operation_id=operation_id,
-            user_uuid=user_uuid,
+            user_uuid=user.user_uuid,
         )
 
         async with get_mcp_use_cases() as uc:

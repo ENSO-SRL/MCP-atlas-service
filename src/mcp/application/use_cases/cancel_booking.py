@@ -1,4 +1,4 @@
-from __future__ import annotations
+from typing import Optional
 
 from src.mcp.application.dto.booking_dtos import (
     CancelBookingInputDTO,
@@ -7,6 +7,7 @@ from src.mcp.application.dto.booking_dtos import (
 from src.mcp.domain.exceptions.mcp_exceptions import EntityNotFoundException
 from src.mcp.domain.ports.mcp_ports import (
     IBookingRepository,
+    ICatalogServiceRepository,
     IOutboxRepository,
 )
 
@@ -23,9 +24,11 @@ class CancelBookingUseCase:
         self,
         booking_repo: IBookingRepository,
         outbox_repo: IOutboxRepository,
+        catalog_repo: Optional[ICatalogServiceRepository] = None,
     ):
         self._booking_repo = booking_repo
         self._outbox_repo = outbox_repo
+        self._catalog_repo = catalog_repo
 
     async def execute(self, query: CancelBookingInputDTO) -> CancellationResultDTO:
         # 1. Recuperar reserva y verificar que pertenece al usuario autenticado
@@ -43,10 +46,18 @@ class CancelBookingUseCase:
         await self._booking_repo.save(booking)
 
         # 4. Registrar evento en Outbox para propagación asíncrona
+        combo_code: Optional[str] = None
+        if self._catalog_repo is not None:
+            svc = await self._catalog_repo.get_by_id(booking.service_id)
+            if svc:
+                combo_code = svc.combo_code
+
         outbox_payload = {
             "booking_id": str(booking.id),
             "user_uuid": str(booking.user_uuid),
+            "user_phone": query.user_phone,
             "service_id": booking.service_id,
+            "combo_code": combo_code,
             "external_ref": booking.external_ref,
             "reason": query.reason,
         }

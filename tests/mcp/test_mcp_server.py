@@ -167,6 +167,49 @@ async def test_tool_call_without_auth_returns_error(server):
     assert "Autenticación requerida" in payload.get("message")
 
 
+def test_auth_context_extracts_phone_number_from_jwt():
+    """Prueba que extract_user_context extrae correctamente el claim phone_number del JWT."""
+    from src.mcp.presentation.auth_context import extract_user_context
+
+    current_user_context.set(None)
+    settings = get_settings()
+    user_id = uuid4()
+    token = jwt.encode(
+        {
+            "sub": str(user_id),
+            "phone_number": "+18095551234",
+            "scope": "bookings:read bookings:write",
+            "exp": int(datetime.now(timezone.utc).timestamp()) + 3600,
+        },
+        key=settings.OAUTH_JWT_SECRET_KEY,
+        algorithm=settings.OAUTH_JWT_ALGORITHM,
+    )
+
+    mock_ctx = MagicMock()
+    mock_ctx.headers = {"Authorization": f"Bearer {token}"}
+
+    user = extract_user_context(mock_ctx, required_scope="bookings:read")
+    assert user.user_uuid == user_id
+    assert user.phone_number == "+18095551234"
+
+
+def test_auth_context_extracts_phone_number_from_dev_headers():
+    """Prueba que extract_user_context extrae X-User-UUID y X-User-Phone."""
+    from src.mcp.presentation.auth_context import extract_user_context
+
+    current_user_context.set(None)
+    user_id = uuid4()
+    mock_ctx = MagicMock()
+    mock_ctx.headers = {
+        "x-user-uuid": str(user_id),
+        "x-user-phone": "+34912345678",
+    }
+
+    user = extract_user_context(mock_ctx)
+    assert user.user_uuid == user_id
+    assert user.phone_number == "+34912345678"
+
+
 # =========================================================================
 # 3. Invocación de Tools de Catálogo y Contratos
 # =========================================================================

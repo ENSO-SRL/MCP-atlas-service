@@ -13,7 +13,11 @@ from src.mcp.domain.exceptions.mcp_exceptions import (
     EntityNotFoundException,
     MissingDimensionDependencyException,
 )
-from src.mcp.domain.ports.mcp_ports import IContractRepository, IRedisBusClient
+from src.mcp.domain.ports.mcp_ports import (
+    ICatalogServiceRepository,
+    IContractRepository,
+    IRedisBusClient,
+)
 from src.mcp.infrastructure.redis.redis_cache_manager import RedisDimensionOptionsCache
 
 
@@ -32,10 +36,12 @@ class GetDimensionOptionsUseCase:
         contract_repo: IContractRepository,
         dim_cache: RedisDimensionOptionsCache,
         bus_client: IRedisBusClient,
+        catalog_repo: Optional[ICatalogServiceRepository] = None,
     ):
         self._contract_repo = contract_repo
         self._dim_cache = dim_cache
         self._bus_client = bus_client
+        self._catalog_repo = catalog_repo
 
     async def execute(self, query: GetDimensionOptionsQueryDTO) -> DimensionOptionsResponseDTO:
         # 1. Obtener contrato activo
@@ -99,8 +105,17 @@ class GetDimensionOptionsUseCase:
 
         # 6. Cache MISS: Encolar petición en bus RPC sobre Redis
         operation_id = f"op_dim_{uuid4().hex[:12]}"
+        combo_code: Optional[str] = None
+        if self._catalog_repo is not None:
+            svc = await self._catalog_repo.get_by_id(query.service_id)
+            if svc:
+                combo_code = svc.combo_code
+
         envelope_payload = {
             "service_id": query.service_id,
+            "combo_code": combo_code,
+            "user_uuid": str(query.user_uuid) if query.user_uuid else None,
+            "user_phone": query.user_phone,
             "dimension_key": query.dimension_key,
             "context": query.context,
             "resolver_ref": dim.resolver_ref,

@@ -336,11 +336,14 @@ async def test_check_availability_cache_miss_with_immediate_response(
         token_codec=mock_token_codec,
     )
 
+    sample_service.combo_code = "PADEL_DOBLES"
+    user_uuid = uuid4()
     res = await use_case.execute(
         CheckAvailabilityQueryDTO(
             service_id=20,
             date_from=today,
-            user_uuid=uuid4(),
+            user_uuid=user_uuid,
+            user_phone="+18095551234",
         )
     )
 
@@ -348,6 +351,10 @@ async def test_check_availability_cache_miss_with_immediate_response(
     assert len(res.slots) == 1
     assert res.slots[0].offer_ref == "off_live_4pm"
     mock_bus.publish_availability_request.assert_called_once()
+    sent_payload = mock_bus.publish_availability_request.call_args[0][1]
+    assert sent_payload["combo_code"] == "PADEL_DOBLES"
+    assert sent_payload["user_uuid"] == str(user_uuid)
+    assert sent_payload["user_phone"] == "+18095551234"
     mock_cache.set.assert_called_once()
 
 

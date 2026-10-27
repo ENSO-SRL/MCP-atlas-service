@@ -374,17 +374,26 @@ async def test_get_dimension_options_cache_miss_with_immediate_response():
         }
     )
 
+    mock_catalog_repo = MagicMock()
+    mock_service = MagicMock()
+    mock_service.combo_code = "TENNIS_CLASES"
+    mock_catalog_repo.get_by_id = AsyncMock(return_value=mock_service)
+
     use_case = GetDimensionOptionsUseCase(
         contract_repo=mock_contract_repo,
         dim_cache=mock_dim_cache,
         bus_client=mock_bus_client,
+        catalog_repo=mock_catalog_repo,
     )
 
+    user_uuid = uuid4()
     res = await use_case.execute(
         GetDimensionOptionsQueryDTO(
             service_id=50,
             dimension_key="instructor",
             context={},
+            user_uuid=user_uuid,
+            user_phone="+18095551234",
         )
     )
 
@@ -392,6 +401,11 @@ async def test_get_dimension_options_cache_miss_with_immediate_response():
     assert len(res.options) == 1
     assert res.options[0].value_key == "inst_10"
     mock_bus_client.publish_dimension_request.assert_called_once()
+    call_args = mock_bus_client.publish_dimension_request.call_args[0]
+    sent_payload = call_args[1]
+    assert sent_payload["combo_code"] == "TENNIS_CLASES"
+    assert sent_payload["user_uuid"] == str(user_uuid)
+    assert sent_payload["user_phone"] == "+18095551234"
     mock_dim_cache.set.assert_called_once()
 
 

@@ -22,6 +22,7 @@ from src.mcp.domain.exceptions.mcp_exceptions import (
 )
 from src.mcp.domain.ports.mcp_ports import (
     IBookingRepository,
+    ICatalogServiceRepository,
     IContractRepository,
     IHoldManager,
     IOutboxRepository,
@@ -66,12 +67,14 @@ class CreateBookingRequestUseCase:
         hold_manager: IHoldManager,
         outbox_repo: IOutboxRepository,
         token_codec: SlotTokenCodec,
+        catalog_repo: Optional[ICatalogServiceRepository] = None,
     ):
         self._booking_repo = booking_repo
         self._contract_repo = contract_repo
         self._hold_manager = hold_manager
         self._outbox_repo = outbox_repo
         self._token_codec = token_codec
+        self._catalog_repo = catalog_repo
 
     async def execute(self, query: CreateBookingInputDTO) -> BookingCreationResultDTO:
         # 1. Determinación preliminar de service_id y extracción de slot_token
@@ -194,10 +197,18 @@ class CreateBookingRequestUseCase:
         await self._booking_repo.save(booking)
 
         # 8. Registro de Evento en Outbox
+        combo_code: Optional[str] = None
+        if self._catalog_repo is not None:
+            svc = await self._catalog_repo.get_by_id(service_id)
+            if svc:
+                combo_code = svc.combo_code
+
         outbox_payload = {
             "booking_id": str(booking.id),
             "user_uuid": str(booking.user_uuid),
+            "user_phone": query.user_phone,
             "service_id": booking.service_id,
+            "combo_code": combo_code,
             "contract_version_id": str(booking.contract_version_id),
             "token_id": booking.token_id,
             "offer_ref": booking.offer_ref,
