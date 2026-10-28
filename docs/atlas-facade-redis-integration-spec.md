@@ -97,10 +97,9 @@ Para las consultas de lectura pesada o dinámica hacia upstream, el MCP utiliza 
     "user_phone": "+18095551234",
     "date": "2026-10-28",
     "filters": {
-      "surface": "cristal",
-      "indoor": true
+      "course": "championsship",
+      "party_size": 2
     },
-    "party_size": 4,
     "contract_version": "v1.0",
     "filter_hash": "6b3f7e8a9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f"
   },

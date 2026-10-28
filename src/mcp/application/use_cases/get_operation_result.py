@@ -132,7 +132,8 @@ class GetOperationResultUseCase:
                 )
 
             applied_filters = raw_result.get("filters", {})
-            party_size = int(raw_result.get("party_size", 1))
+            if "party_size" not in applied_filters and "party_size" in raw_result:
+                applied_filters["party_size"] = raw_result["party_size"]
             raw_slots = raw_result.get("slots", [])
 
             # Poblado diferido de la caché determinista (avail:cache:{service_id}:{contract_version}:{filter_hash})
@@ -155,7 +156,6 @@ class GetOperationResultUseCase:
                 contract=contract,
                 user_uuid=query.user_uuid,
                 applied_filters=applied_filters,
-                party_size=party_size,
                 hold_manager=self._hold_manager,
                 token_codec=self._token_codec,
                 price_rules=price_rules,

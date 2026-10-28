@@ -17,6 +17,7 @@ class ServicePriceRule(Entity[UUID]):
     Regla de precio estructurada para un servicio.
     Evalúa si aplica para un horario y cantidad de personas, calculando el estimado informativo.
     """
+    id: UUID = field(default_factory=uuid4)
     service_id: int = 0
     label: str = "Tarifa estándar"
     weekdays: list[int] = field(default_factory=lambda: [1, 2, 3, 4, 5, 6, 7])
@@ -28,6 +29,7 @@ class ServicePriceRule(Entity[UUID]):
     max_party_size: Optional[int] = None
     min_duration_min: Optional[int] = None
     max_duration_min: Optional[int] = None
+    dimension_conditions: Optional[dict[str, Any]] = None
     amount: Decimal = Decimal("0.00")
     currency: str = "DOP"
     calculation_basis: CalculationBasis = CalculationBasis.PER_BOOKING
@@ -39,8 +41,9 @@ class ServicePriceRule(Entity[UUID]):
         target_datetime: datetime,
         party_size: int = 1,
         duration_minutes: Optional[int] = None,
+        applied_filters: Optional[dict[str, Any]] = None,
     ) -> bool:
-        """Determina si esta regla aplica según vigencia, día, horario, personas y duración."""
+        """Determina si esta regla aplica según vigencia, día, horario, personas, duración y filtros de dimensión."""
         target_date = target_datetime.date()
 
         # 1. Vigencia por fechas
@@ -70,6 +73,14 @@ class ServicePriceRule(Entity[UUID]):
                 return False
             if self.max_duration_min and duration_minutes > self.max_duration_min:
                 return False
+
+        # 6. Condiciones de dimensión (ej. course="championsship")
+        if self.dimension_conditions:
+            if not applied_filters:
+                return False
+            for cond_key, cond_val in self.dimension_conditions.items():
+                if applied_filters.get(cond_key) != cond_val:
+                    return False
 
         return True
 

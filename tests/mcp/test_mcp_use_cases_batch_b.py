@@ -248,8 +248,7 @@ async def test_check_availability_fast_path_cache_hit_with_holds_and_estimated_q
         CheckAvailabilityQueryDTO(
             service_id=20,
             date=today,
-            filters={"surface": "clay"},
-            party_size=2,
+            filters={"surface": "clay", "party_size": 2},
             user_uuid=user_uuid,
         )
     )
@@ -272,7 +271,7 @@ async def test_check_availability_fast_path_cache_hit_with_holds_and_estimated_q
     decoded_token = mock_token_codec.decode(slot_1.slot_token)
     assert decoded_token.user_uuid == user_uuid
     assert decoded_token.offer_ref == "off_court_1_10am"
-    assert decoded_token.applied_filters == {"surface": "clay"}
+    assert decoded_token.applied_filters == {"surface": "clay", "party_size": 2}
 
     # Slot 2: estimado del Queuer
     slot_2 = res.slots[1]
@@ -557,7 +556,7 @@ async def test_get_operation_result_completed_availability_with_tokens(
     decoded = mock_token_codec.decode(slot.slot_token)
     assert decoded.user_uuid == user_uuid
     assert decoded.offer_ref == "off_deferred_slot_1"
-    assert decoded.applied_filters == {"indoor": True}
+    assert decoded.applied_filters == {"indoor": True, "party_size": 4}
 
 
 @pytest.mark.asyncio
@@ -576,6 +575,7 @@ async def test_get_operation_result_populates_dimension_cache(mock_token_codec):
     )
     mock_contract = MagicMock()
     mock_hold = MagicMock()
+    mock_avail_cache = MagicMock()
     mock_dim_cache = MagicMock()
     mock_dim_cache.set_by_hash = AsyncMock()
 
@@ -584,6 +584,7 @@ async def test_get_operation_result_populates_dimension_cache(mock_token_codec):
         contract_repo=mock_contract,
         hold_manager=mock_hold,
         token_codec=mock_token_codec,
+        avail_cache=mock_avail_cache,
         dim_cache=mock_dim_cache,
     )
 
@@ -632,6 +633,7 @@ async def test_get_operation_result_populates_availability_cache(
     mock_hold.is_held = AsyncMock(return_value=False)
     mock_avail_cache = MagicMock()
     mock_avail_cache.set = AsyncMock()
+    mock_dim_cache = MagicMock()
 
     use_case = GetOperationResultUseCase(
         bus_client=mock_bus,
@@ -639,6 +641,7 @@ async def test_get_operation_result_populates_availability_cache(
         hold_manager=mock_hold,
         token_codec=mock_token_codec,
         avail_cache=mock_avail_cache,
+        dim_cache=mock_dim_cache,
     )
 
     res = await use_case.execute(
@@ -663,3 +666,44 @@ async def test_get_operation_result_populates_availability_cache(
             ]
         },
     )
+
+
+def test_service_price_rule_dimension_conditions_pga_golf():
+    """Valida que las reglas de precio diferencien tarifas según condiciones de dimensión (Championship vs Par 3)."""
+    now = datetime(2026, 10, 28, 10, 0, tzinfo=timezone.utc)
+
+    rule_championship = ServicePriceRule(
+        service_id=20,
+        label="Tarifa Championship (18 hoyos)",
+        amount=Decimal("285.00"),
+        currency="USD",
+        calculation_basis=CalculationBasis.PER_PERSON,
+        dimension_conditions={"course": "championsship"},
+    )
+
+    rule_par3 = ServicePriceRule(
+        service_id=20,
+        label="Tarifa Par 3 Course (9 hoyos)",
+        amount=Decimal("55.00"),
+        currency="USD",
+        calculation_basis=CalculationBasis.PER_PERSON,
+        dimension_conditions={"course": "par 3 course"},
+    )
+
+    # 1. Filtros para Championship con 2 jugadores
+    filters_champ = {"course": "championsship", "party_size": 2}
+    assert rule_championship.is_applicable(now, party_size=2, applied_filters=filters_champ) is True
+    assert rule_par3.is_applicable(now, party_size=2, applied_filters=filters_champ) is False
+
+    est_champ = rule_championship.calculate_estimate(party_size=2)
+    assert est_champ.amount == Decimal("570.00")
+    assert est_champ.currency == "USD"
+
+    # 2. Filtros para Par 3 Course con 3 jugadores
+    filters_par3 = {"course": "par 3 course", "party_size": 3}
+    assert rule_championship.is_applicable(now, party_size=3, applied_filters=filters_par3) is False
+    assert rule_par3.is_applicable(now, party_size=3, applied_filters=filters_par3) is True
+
+    est_par3 = rule_par3.calculate_estimate(party_size=3)
+    assert est_par3.amount == Decimal("165.00")
+    assert est_par3.currency == "USD"

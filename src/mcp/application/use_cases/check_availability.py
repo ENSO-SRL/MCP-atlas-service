@@ -36,20 +36,23 @@ async def process_raw_slots(
     contract: ServiceContractVersion,
     user_uuid: UUID,
     applied_filters: dict[str, Any],
-    party_size: int,
     hold_manager: IHoldManager,
     token_codec: SlotTokenCodec,
     price_rules: list[ServicePriceRule],
+    party_size: Optional[int] = None,
 ) -> list[AvailableSlotDTO]:
     """
     Procesa slots crudos:
     1. Descarta o filtra slots bloqueados con hold atómico activo en Redis.
-    2. Evalúa reglas de tarifas aplicables para el horario y personas.
+    2. Evalúa reglas de tarifas aplicables para el horario, personas y filtros de dimensión.
     3. Acuña tokens criptográficos firmados (SlotToken) vinculados estrictamente al user_uuid.
     4. Detecta y marca slots estimados del sistema Queuer.
     """
     contract_version_label = (
         f"{contract.published_at.strftime('%Y-%m-%d') if contract.published_at else 'v'}.{contract.version_no}"
+    )
+    effective_party_size = (
+        party_size if party_size is not None else int(applied_filters.get("party_size", 1))
     )
     available_slots: list[AvailableSlotDTO] = []
 
@@ -86,8 +89,8 @@ async def process_raw_slots(
         # 3. Estimación de precio
         price_dto: Optional[SlotPriceEstimateDTO] = None
         for rule in sorted(price_rules, key=lambda r: r.priority, reverse=True):
-            if rule.is_applicable(slot_start, party_size=party_size):
-                estimate = rule.calculate_estimate(party_size=party_size)
+            if rule.is_applicable(slot_start, party_size=effective_party_size, applied_filters=applied_filters):
+                estimate = rule.calculate_estimate(party_size=effective_party_size)
                 price_dto = SlotPriceEstimateDTO(
                     amount=estimate.amount,
                     currency=estimate.currency,
@@ -204,7 +207,6 @@ class CheckAvailabilityUseCase:
         )
         search_context = {
             "date": query.date.isoformat(),
-            "party_size": query.party_size,
             **query.filters,
         }
         filter_hash = CanonicalFilterHash.from_filters(search_context).hash_value
@@ -227,7 +229,6 @@ class CheckAvailabilityUseCase:
                 "user_phone": query.user_phone,
                 "date": query.date.isoformat(),
                 "filters": query.filters,
-                "party_size": query.party_size,
                 "contract_version": contract_version_label,
                 "filter_hash": filter_hash,
             }
@@ -268,7 +269,6 @@ class CheckAvailabilityUseCase:
             contract=contract,
             user_uuid=query.user_uuid,
             applied_filters=query.filters,
-            party_size=query.party_size,
             hold_manager=self._hold_manager,
             token_codec=self._token_codec,
             price_rules=price_rules,

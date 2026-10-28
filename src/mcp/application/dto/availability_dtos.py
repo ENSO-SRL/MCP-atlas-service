@@ -16,7 +16,6 @@ class CheckAvailabilityQueryDTO:
     date: date
     user_uuid: UUID
     filters: dict[str, Any] = field(default_factory=dict)
-    party_size: int = 1
     user_phone: Optional[str] = None
 
 

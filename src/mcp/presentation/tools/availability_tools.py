@@ -37,7 +37,6 @@ def register_availability_tools(server: MCPServer) -> None:
         service_id: int,
         date: str,
         filters: Optional[dict[str, Any]] = None,
-        party_size: int = 1,
         ctx: Optional[Context] = None,
     ) -> dict[str, Any]:
         user = extract_user_context(ctx, required_scope="bookings:read")
@@ -53,7 +52,6 @@ def register_availability_tools(server: MCPServer) -> None:
             service_id=service_id,
             date=target_date,
             filters=filters or {},
-            party_size=party_size,
             user_uuid=user.user_uuid,
             user_phone=user.phone_number,
         )

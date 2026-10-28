@@ -165,6 +165,7 @@ class SqlContractRepository(IContractRepository):
                     max_party_size=m.max_party_size,
                     min_duration_min=m.min_duration_min,
                     max_duration_min=m.max_duration_min,
+                    dimension_conditions=m.dimension_conditions,
                     amount=m.amount,
                     currency=currency,
                     calculation_basis=CalculationBasis(m.calculation_basis),
