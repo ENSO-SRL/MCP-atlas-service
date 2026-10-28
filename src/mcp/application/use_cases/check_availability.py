@@ -191,10 +191,10 @@ class CheckAvailabilityUseCase:
 
         # 3. Validación de antelación según políticas del establecimiento
         est = await self._establishment_repo.get_by_id(svc.establishment_id)
-        if est and not est.is_date_allowed(query.date_from):
+        if est and not est.is_date_allowed(query.date):
             rule_name = est.rule_type.value if est.rule_type else "política de antelación"
             raise BookingRuleViolationException(
-                f"La fecha consultada ({query.date_from}) no está permitida por el establecimiento "
+                f"La fecha consultada ({query.date}) no está permitida por el establecimiento "
                 f"según su regla operativa ({rule_name})."
             )
 
@@ -203,8 +203,7 @@ class CheckAvailabilityUseCase:
             f"{contract.published_at.strftime('%Y-%m-%d') if contract.published_at else 'v'}.{contract.version_no}"
         )
         search_context = {
-            "date_from": query.date_from.isoformat(),
-            "date_to": query.date_to.isoformat() if query.date_to else None,
+            "date": query.date.isoformat(),
             "party_size": query.party_size,
             **query.filters,
         }
@@ -226,8 +225,7 @@ class CheckAvailabilityUseCase:
                 "combo_code": svc.combo_code if svc else None,
                 "user_uuid": str(query.user_uuid),
                 "user_phone": query.user_phone,
-                "date_from": query.date_from.isoformat(),
-                "date_to": query.date_to.isoformat() if query.date_to else None,
+                "date": query.date.isoformat(),
                 "filters": query.filters,
                 "party_size": query.party_size,
                 "contract_version": contract_version_label,

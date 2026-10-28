@@ -118,7 +118,7 @@ async def test_check_availability_on_demand_returns_guidance(
     res = await use_case.execute(
         CheckAvailabilityQueryDTO(
             service_id=20,
-            date_from=date.today(),
+            date=date.today(),
             user_uuid=uuid4(),
         )
     )
@@ -162,7 +162,7 @@ async def test_check_availability_anticipation_rule_violated_raises(
         await use_case.execute(
             CheckAvailabilityQueryDTO(
                 service_id=20,
-                date_from=tomorrow,
+                date=tomorrow,
                 user_uuid=uuid4(),
             )
         )
@@ -247,7 +247,7 @@ async def test_check_availability_fast_path_cache_hit_with_holds_and_estimated_q
     res = await use_case.execute(
         CheckAvailabilityQueryDTO(
             service_id=20,
-            date_from=today,
+            date=today,
             filters={"surface": "clay"},
             party_size=2,
             user_uuid=user_uuid,
@@ -341,7 +341,7 @@ async def test_check_availability_cache_miss_with_immediate_response(
     res = await use_case.execute(
         CheckAvailabilityQueryDTO(
             service_id=20,
-            date_from=today,
+            date=today,
             user_uuid=user_uuid,
             user_phone="+18095551234",
         )
@@ -355,6 +355,7 @@ async def test_check_availability_cache_miss_with_immediate_response(
     assert sent_payload["combo_code"] == "PADEL_DOBLES"
     assert sent_payload["user_uuid"] == str(user_uuid)
     assert sent_payload["user_phone"] == "+18095551234"
+    assert sent_payload["date"] == today.isoformat()
     mock_cache.set.assert_called_once()
 
 
@@ -394,7 +395,7 @@ async def test_check_availability_cache_miss_timeout_returns_processing(
     res = await use_case.execute(
         CheckAvailabilityQueryDTO(
             service_id=20,
-            date_from=today,
+            date=today,
             user_uuid=uuid4(),
         )
     )
@@ -412,11 +413,16 @@ async def test_get_operation_result_not_found(mock_token_codec):
     mock_contract = MagicMock()
     mock_hold = MagicMock()
 
+    mock_avail = MagicMock()
+    mock_dim = MagicMock()
+
     use_case = GetOperationResultUseCase(
         bus_client=mock_bus,
         contract_repo=mock_contract,
         hold_manager=mock_hold,
         token_codec=mock_token_codec,
+        avail_cache=mock_avail,
+        dim_cache=mock_dim,
     )
 
     res = await use_case.execute(
@@ -433,12 +439,16 @@ async def test_get_operation_result_still_processing(mock_token_codec):
     mock_bus.get_operation_result = AsyncMock(return_value={"status": "processing"})
     mock_contract = MagicMock()
     mock_hold = MagicMock()
+    mock_avail = MagicMock()
+    mock_dim = MagicMock()
 
     use_case = GetOperationResultUseCase(
         bus_client=mock_bus,
         contract_repo=mock_contract,
         hold_manager=mock_hold,
         token_codec=mock_token_codec,
+        avail_cache=mock_avail,
+        dim_cache=mock_dim,
     )
 
     res = await use_case.execute(
@@ -463,12 +473,16 @@ async def test_get_operation_result_completed_dimension_options(mock_token_codec
     )
     mock_contract = MagicMock()
     mock_hold = MagicMock()
+    mock_avail = MagicMock()
+    mock_dim = MagicMock()
 
     use_case = GetOperationResultUseCase(
         bus_client=mock_bus,
         contract_repo=mock_contract,
         hold_manager=mock_hold,
         token_codec=mock_token_codec,
+        avail_cache=mock_avail,
+        dim_cache=mock_dim,
     )
 
     res = await use_case.execute(
@@ -515,12 +529,16 @@ async def test_get_operation_result_completed_availability_with_tokens(
 
     mock_hold = MagicMock()
     mock_hold.is_held = AsyncMock(return_value=False)
+    mock_avail = MagicMock()
+    mock_dim = MagicMock()
 
     use_case = GetOperationResultUseCase(
         bus_client=mock_bus,
         contract_repo=mock_contract,
         hold_manager=mock_hold,
         token_codec=mock_token_codec,
+        avail_cache=mock_avail,
+        dim_cache=mock_dim,
     )
 
     res = await use_case.execute(
@@ -540,3 +558,108 @@ async def test_get_operation_result_completed_availability_with_tokens(
     assert decoded.user_uuid == user_uuid
     assert decoded.offer_ref == "off_deferred_slot_1"
     assert decoded.applied_filters == {"indoor": True}
+
+
+@pytest.mark.asyncio
+async def test_get_operation_result_populates_dimension_cache(mock_token_codec):
+    mock_bus = MagicMock()
+    mock_bus.get_operation_result = AsyncMock(
+        return_value={
+            "status": "completed",
+            "service_id": 20,
+            "dimension_key": "mechanic",
+            "context_hash": "ctx_hash_abc123",
+            "options": [
+                {"value_key": "clay", "label": "Arcilla"},
+            ],
+        }
+    )
+    mock_contract = MagicMock()
+    mock_hold = MagicMock()
+    mock_dim_cache = MagicMock()
+    mock_dim_cache.set_by_hash = AsyncMock()
+
+    use_case = GetOperationResultUseCase(
+        bus_client=mock_bus,
+        contract_repo=mock_contract,
+        hold_manager=mock_hold,
+        token_codec=mock_token_codec,
+        dim_cache=mock_dim_cache,
+    )
+
+    res = await use_case.execute(
+        GetOperationResultQueryDTO(operation_id="op_dim_done", user_uuid=uuid4())
+    )
+
+    assert res.status == "completed"
+    mock_dim_cache.set_by_hash.assert_awaited_once_with(
+        service_id=20,
+        dimension_key="mechanic",
+        context_hash="ctx_hash_abc123",
+        options=[{"value_key": "clay", "label": "Arcilla"}],
+    )
+
+
+@pytest.mark.asyncio
+async def test_get_operation_result_populates_availability_cache(
+    sample_contract, sample_price_rule, mock_token_codec
+):
+    mock_bus = MagicMock()
+    mock_bus.get_operation_result = AsyncMock(
+        return_value={
+            "status": "completed",
+            "service_id": 20,
+            "contract_version": "v1.0",
+            "filter_hash": "fhash_xyz789",
+            "filters": {"indoor": True},
+            "party_size": 2,
+            "slots": [
+                {
+                    "offer_ref": "off_cached_slot",
+                    "slot_start": "2026-10-28T18:00:00Z",
+                    "slot_end": "2026-10-28T19:30:00Z",
+                    "resource_ref": "court_1",
+                    "resource_name": "Pista 1",
+                    "is_estimated": False,
+                }
+            ],
+        }
+    )
+    mock_contract = MagicMock()
+    mock_contract.get_active_by_service_id = AsyncMock(return_value=sample_contract)
+    mock_contract.list_price_rules_for_service = AsyncMock(return_value=[sample_price_rule])
+    mock_hold = MagicMock()
+    mock_hold.is_held = AsyncMock(return_value=False)
+    mock_avail_cache = MagicMock()
+    mock_avail_cache.set = AsyncMock()
+
+    use_case = GetOperationResultUseCase(
+        bus_client=mock_bus,
+        contract_repo=mock_contract,
+        hold_manager=mock_hold,
+        token_codec=mock_token_codec,
+        avail_cache=mock_avail_cache,
+    )
+
+    res = await use_case.execute(
+        GetOperationResultQueryDTO(operation_id="op_avail_cached", user_uuid=uuid4())
+    )
+
+    assert res.status == "completed"
+    mock_avail_cache.set.assert_awaited_once_with(
+        service_id=20,
+        contract_version="v1.0",
+        filter_hash="fhash_xyz789",
+        data={
+            "slots": [
+                {
+                    "offer_ref": "off_cached_slot",
+                    "slot_start": "2026-10-28T18:00:00Z",
+                    "slot_end": "2026-10-28T19:30:00Z",
+                    "resource_ref": "court_1",
+                    "resource_name": "Pista 1",
+                    "is_estimated": False,
+                }
+            ]
+        },
+    )

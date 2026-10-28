@@ -13,9 +13,8 @@ from src.mcp.application.dto.contract_dtos import DimensionOptionDTO
 class CheckAvailabilityQueryDTO:
     """Parámetros para consultar disponibilidad de slots horarias."""
     service_id: int
-    date_from: date
+    date: date
     user_uuid: UUID
-    date_to: Optional[date] = None
     filters: dict[str, Any] = field(default_factory=dict)
     party_size: int = 1
     user_phone: Optional[str] = None

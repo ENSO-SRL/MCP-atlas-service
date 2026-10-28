@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date as dt_date
 from typing import Any, Optional
 
 from mcp.server.mcpserver import Context, MCPServer
@@ -23,7 +23,7 @@ def register_availability_tools(server: MCPServer) -> None:
         name="check_availability",
         title="Consultar Disponibilidad de Servicios",
         description=(
-            "Consulta los horarios y slots disponibles para un servicio concreto en Atlas. "
+            "Consulta los horarios y slots disponibles para un servicio concreto en Atlas en una fecha dada. "
             "Para servicios estándar (pádel, golf, talleres), retorna slots reales con su 'slot_token' "
             "criptográfico firmado e inmutable, necesario para reservar con 'create_booking_request'. "
             "Para servicios con sistema Queuer, entrega slots estimados identificados claramente. "
@@ -35,8 +35,7 @@ def register_availability_tools(server: MCPServer) -> None:
     @handle_mcp_errors
     async def check_availability(
         service_id: int,
-        date_from: str,
-        date_to: Optional[str] = None,
+        date: str,
         filters: Optional[dict[str, Any]] = None,
         party_size: int = 1,
         ctx: Optional[Context] = None,
@@ -44,25 +43,15 @@ def register_availability_tools(server: MCPServer) -> None:
         user = extract_user_context(ctx, required_scope="bookings:read")
 
         try:
-            d_from = date.fromisoformat(date_from)
+            target_date = dt_date.fromisoformat(date)
         except ValueError:
             raise ContractValidationException(
-                f"Formato de fecha inválido en 'date_from': '{date_from}'. Formato requerido: YYYY-MM-DD."
+                f"Formato de fecha inválido en 'date': '{date}'. Formato requerido: YYYY-MM-DD."
             )
-
-        d_to: Optional[date] = None
-        if date_to:
-            try:
-                d_to = date.fromisoformat(date_to)
-            except ValueError:
-                raise ContractValidationException(
-                    f"Formato de fecha inválido en 'date_to': '{date_to}'. Formato requerido: YYYY-MM-DD."
-                )
 
         dto_query = CheckAvailabilityQueryDTO(
             service_id=service_id,
-            date_from=d_from,
-            date_to=d_to,
+            date=target_date,
             filters=filters or {},
             party_size=party_size,
             user_uuid=user.user_uuid,

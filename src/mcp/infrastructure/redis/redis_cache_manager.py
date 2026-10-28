@@ -76,18 +76,41 @@ class RedisDimensionOptionsCache:
         return compute_context_hash(context)
 
     @staticmethod
-    def build_key(service_id: int, dimension_key: str, context: dict[str, Any]) -> str:
-        context_hash = compute_context_hash(context)
+    def build_key_from_hash(service_id: int, dimension_key: str, context_hash: str) -> str:
         return f"dim:cache:{service_id}:{dimension_key}:{context_hash}"
 
-    async def get(
-        self, service_id: int, dimension_key: str, context: dict[str, Any]
+    @staticmethod
+    def build_key(service_id: int, dimension_key: str, context: dict[str, Any]) -> str:
+        context_hash = compute_context_hash(context)
+        return RedisDimensionOptionsCache.build_key_from_hash(service_id, dimension_key, context_hash)
+
+    async def get_by_hash(
+        self, service_id: int, dimension_key: str, context_hash: str
     ) -> Optional[list[dict[str, Any]]]:
-        key = self.build_key(service_id, dimension_key, context)
+        key = self.build_key_from_hash(service_id, dimension_key, context_hash)
         raw = await self._redis.get(key)
         if raw is None:
             return None
         return json.loads(raw)
+
+    async def get(
+        self, service_id: int, dimension_key: str, context: dict[str, Any]
+    ) -> Optional[list[dict[str, Any]]]:
+        context_hash = self.compute_context_hash(context)
+        return await self.get_by_hash(service_id, dimension_key, context_hash)
+
+    async def set_by_hash(
+        self,
+        service_id: int,
+        dimension_key: str,
+        context_hash: str,
+        options: list[dict[str, Any]],
+        ttl_seconds: Optional[int] = None,
+    ) -> None:
+        key = self.build_key_from_hash(service_id, dimension_key, context_hash)
+        ttl = ttl_seconds if ttl_seconds is not None else self._default_ttl
+        serialized = json.dumps(options, ensure_ascii=False)
+        await self._redis.set(key, serialized, ex=ttl)
 
     async def set(
         self,
@@ -97,10 +120,14 @@ class RedisDimensionOptionsCache:
         options: list[dict[str, Any]],
         ttl_seconds: Optional[int] = None,
     ) -> None:
-        key = self.build_key(service_id, dimension_key, context)
-        ttl = ttl_seconds if ttl_seconds is not None else self._default_ttl
-        serialized = json.dumps(options, ensure_ascii=False)
-        await self._redis.set(key, serialized, ex=ttl)
+        context_hash = self.compute_context_hash(context)
+        await self.set_by_hash(
+            service_id=service_id,
+            dimension_key=dimension_key,
+            context_hash=context_hash,
+            options=options,
+            ttl_seconds=ttl_seconds,
+        )
 
     async def delete(self, service_id: int, dimension_key: str, context: dict[str, Any]) -> None:
         key = self.build_key(service_id, dimension_key, context)

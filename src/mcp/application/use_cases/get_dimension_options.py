@@ -118,6 +118,7 @@ class GetDimensionOptionsUseCase:
             "user_phone": query.user_phone,
             "dimension_key": query.dimension_key,
             "context": query.context,
+            "context_hash": context_hash,
             "resolver_ref": dim.resolver_ref,
         }
 

@@ -91,7 +91,14 @@ def build_mcp_use_cases(
         check_availability=CheckAvailabilityUseCase(
             est_repo, svc_repo, contract_repo, avail_cache, hold_manager, bus_client, token_codec
         ),
-        get_operation_result=GetOperationResultUseCase(bus_client, hold_manager, token_codec, contract_repo),
+        get_operation_result=GetOperationResultUseCase(
+            bus_client=bus_client,
+            contract_repo=contract_repo,
+            hold_manager=hold_manager,
+            token_codec=token_codec,
+            avail_cache=avail_cache,
+            dim_cache=dim_cache,
+        ),
         create_booking_request=CreateBookingRequestUseCase(
             booking_repo, contract_repo, hold_manager, outbox_repo, token_codec, catalog_repo=svc_repo
         ),

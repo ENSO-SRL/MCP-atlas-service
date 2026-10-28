@@ -95,14 +95,14 @@ Para las consultas de lectura pesada o dinámica hacia upstream, el MCP utiliza 
     "combo_code": "PADEL_INDOOR",
     "user_uuid": "c4d7e231-1829-4d6b-9c71-332998822001",
     "user_phone": "+18095551234",
-    "date_from": "2026-10-28",
-    "date_to": "2026-10-28",
+    "date": "2026-10-28",
     "filters": {
       "surface": "cristal",
       "indoor": true
     },
     "party_size": 4,
-    "contract_version": "v1.0"
+    "contract_version": "v1.0",
+    "filter_hash": "6b3f7e8a9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f"
   },
   "created_at": "2026-10-27T15:00:00Z"
 }
@@ -121,8 +121,11 @@ El Facade debe resolver los slots contra el club/sede física (o generar slots v
    * Actualizar el estado en `op:{operation_id}` (vía `SET op:{operation_id} '<json_state>' EX 600`).
    * Adicionalmente, hacer `RPUSH resp:{operation_id} '<json_payload>'` (patrón de *Lazy Sync* defensivo).
 
-3. **Poblado de la Caché (Cache-Aside):**  
-   Para optimizar futuras consultas idénticas antes de que venzan:
+3. **Echo de Claves de Caché (Obligatorio en la Respuesta):**  
+   Para permitir que el MCP pueble automáticamente la caché canónica `avail:cache:{service_id}:{contract_version}:{filter_hash}` tanto en lecturas rápidas como diferidas (`get_operation_result`), el Facade **debe retornar de vuelta** en su respuesta: `service_id`, `contract_version` y `filter_hash`.
+
+4. **Poblado Opcional Directo en Caché (Cache-Aside Upstream):**  
+   El Facade también puede poblar directamente la caché para optimizar futuras consultas idénticas:
    * **Clave:** `avail:cache:{service_id}:{contract_version}:{filter_hash}`
    * **TTL:** 600 segundos (10 min).
    * **Comando:** `SET avail:cache:{service_id}:{contract_version}:{filter_hash} '<json_data>' EX 600`
@@ -135,6 +138,7 @@ El Facade debe resolver los slots contra el club/sede física (o generar slots v
   "result_type": "availability",
   "service_id": 20,
   "contract_version": "v1.0",
+  "filter_hash": "6b3f7e8a9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f",
   "as_of": "2026-10-27T15:00:01.500000Z",
   "slots": [
     {
@@ -233,7 +237,10 @@ Aplica para dimensiones cuyo contrato declara `values_source = "separate_query"`
    * Ejecutar `EXPIRE resp:{operation_id} 60`.
 2. **Respuesta Diferida (> 2.0s):**
    * Actualizar `op:{operation_id}` con `SET ... EX 600`.
-3. **Poblado de Caché:**
+3. **Echo de Claves de Caché (Obligatorio en la Respuesta):**
+   * El Facade **debe retornar de vuelta**: `service_id`, `dimension_key` y `context_hash`.
+   * Esto permite que el MCP pueble automáticamente `dim:cache:{service_id}:{dimension_key}:{context_hash}` tanto en lecturas rápidas como diferidas (`get_operation_result`).
+4. **Poblado Opcional Directo en Caché:**
    * **Clave:** `dim:cache:{service_id}:{dimension_key}:{context_hash}`
    * **Comando:** `SET dim:cache:{service_id}:{dimension_key}:{context_hash} '<json_options>' EX 600`
 
@@ -243,7 +250,9 @@ Aplica para dimensiones cuyo contrato declara `values_source = "separate_query"`
   "operation_id": "op-dim-77889900-1122-3344-5566-778899aabbcc",
   "status": "completed",
   "result_type": "dimension_options",
+  "service_id": 20,
   "dimension_key": "mechanic",
+  "context_hash": "a1b2c3d4e5f6...",
   "options": [
     {
       "value_key": "mech-juan",
@@ -258,7 +267,6 @@ Aplica para dimensiones cuyo contrato declara `values_source = "separate_query"`
       "position": 2
     }
   ],
-  "context_hash": "a1b2c3d4e5f6...",
   "expires_in_seconds": 600
 }
 ```
@@ -647,8 +655,8 @@ class AtlasFacadeService:
             "slots": [
                 {
                     "offer_ref": f"off-{service_id}-court1-1800",
-                    "slot_start": f"{payload['date_from']}T18:00:00Z",
-                    "slot_end": f"{payload['date_from']}T19:30:00Z",
+                    "slot_start": f"{payload['date']}T18:00:00Z",
+                    "slot_end": f"{payload['date']}T19:30:00Z",
                     "resource_ref": "court-1",
                     "resource_name": "Pista Panorámica 1",
                     "is_estimated": False,

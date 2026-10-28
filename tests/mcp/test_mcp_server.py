@@ -349,7 +349,7 @@ async def test_check_availability_tool_execution(server, mock_use_cases):
 
     result = await server.call_tool(
         "check_availability",
-        {"service_id": 20, "date_from": "2026-10-28", "filters": {"surface": "cristal"}},
+        {"service_id": 20, "date": "2026-10-28", "filters": {"surface": "cristal"}},
     )
     data = json.loads(result.content[0].text)
 
@@ -453,7 +453,7 @@ async def test_booking_rule_violation_caught_and_formatted(server, mock_use_case
         side_effect=BookingRuleViolationException("El establecimiento solo permite reservar para hoy.")
     )
 
-    result = await server.call_tool("check_availability", {"service_id": 20, "date_from": "2026-11-01"})
+    result = await server.call_tool("check_availability", {"service_id": 20, "date": "2026-11-01"})
     data = json.loads(result.content[0].text)
 
     assert data["error"] is True
