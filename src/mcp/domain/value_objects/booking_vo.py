@@ -32,23 +32,29 @@ class IdempotencyKey(ValueObject):
 @dataclass(frozen=True)
 class PriceEstimate(ValueObject):
     """
-    Estimado de precio informativo para un slot o reserva.
+    Estimado o tipificación de precio informativo para un slot o reserva.
     Cumple con la directriz de Anthropic: precio siempre informativo (informative: True).
     """
-    amount: Decimal
+    amount: Optional[Decimal] = None
+    unit_amount: Optional[Decimal] = None
+    total_amount: Optional[Decimal] = None
     currency: str = "DOP"
     basis: CalculationBasis = CalculationBasis.PER_BOOKING
     label: str = "Tarifa estándar"
     rule_id: Optional[UUID] = None
     informative: bool = True
+    formatted: str = ""
     note: str = "Precio informativo; el establecimiento confirma la cotización final."
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "amount": float(self.amount),
+            "amount": float(self.amount) if self.amount is not None else None,
+            "unit_amount": float(self.unit_amount) if self.unit_amount is not None else None,
+            "total_amount": float(self.total_amount) if self.total_amount is not None else None,
             "currency": self.currency,
             "basis": self.basis.value,
             "label": self.label,
             "informative": self.informative,
+            "formatted": self.formatted,
             "note": self.note,
         }

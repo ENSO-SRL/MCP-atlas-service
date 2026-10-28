@@ -51,9 +51,13 @@ async def process_raw_slots(
     contract_version_label = (
         f"{contract.published_at.strftime('%Y-%m-%d') if contract.published_at else 'v'}.{contract.version_no}"
     )
-    effective_party_size = (
-        party_size if party_size is not None else int(applied_filters.get("party_size", 1))
-    )
+    evaluated_party_size: Optional[int] = party_size
+    if evaluated_party_size is None and "party_size" in applied_filters:
+        try:
+            evaluated_party_size = int(applied_filters["party_size"])
+        except (ValueError, TypeError):
+            evaluated_party_size = None
+
     available_slots: list[AvailableSlotDTO] = []
 
     for item in raw_slots:
@@ -89,15 +93,18 @@ async def process_raw_slots(
         # 3. Estimación de precio
         price_dto: Optional[SlotPriceEstimateDTO] = None
         for rule in sorted(price_rules, key=lambda r: r.priority, reverse=True):
-            if rule.is_applicable(slot_start, party_size=effective_party_size, applied_filters=applied_filters):
-                estimate = rule.calculate_estimate(party_size=effective_party_size)
+            if rule.is_applicable(slot_start, party_size=evaluated_party_size, applied_filters=applied_filters):
+                estimate = rule.calculate_estimate(party_size=evaluated_party_size)
                 price_dto = SlotPriceEstimateDTO(
                     amount=estimate.amount,
+                    unit_amount=estimate.unit_amount,
+                    total_amount=estimate.total_amount,
                     currency=estimate.currency,
                     calculation_basis=estimate.basis.value,
                     is_starting_price=rule.is_starting_price,
+                    tax_included=True,
                     rule_label=rule.label,
-                    formatted=f"{estimate.amount:.2f} {estimate.currency}",
+                    formatted=estimate.formatted,
                 )
                 break
 

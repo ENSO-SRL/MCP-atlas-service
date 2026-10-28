@@ -22,7 +22,9 @@ class CheckAvailabilityQueryDTO:
 @dataclass
 class SlotPriceEstimateDTO:
     """Estimación informativa de tarifa para un slot."""
-    amount: Decimal
+    amount: Optional[Decimal] = None
+    unit_amount: Optional[Decimal] = None
+    total_amount: Optional[Decimal] = None
     currency: str = "DOP"
     calculation_basis: str = "per_booking"
     is_starting_price: bool = False

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Optional
+from typing import Any, Optional
 from uuid import UUID, uuid4
 
 from src.mcp.domain.enums.mcp_enums import CalculationBasis
@@ -39,7 +39,7 @@ class ServicePriceRule(Entity[UUID]):
     def is_applicable(
         self,
         target_datetime: datetime,
-        party_size: int = 1,
+        party_size: Optional[int] = None,
         duration_minutes: Optional[int] = None,
         applied_filters: Optional[dict[str, Any]] = None,
     ) -> bool:
@@ -62,10 +62,11 @@ class ServicePriceRule(Entity[UUID]):
             return False
 
         # 4. Cantidad de personas
-        if self.min_party_size and party_size < self.min_party_size:
-            return False
-        if self.max_party_size and party_size > self.max_party_size:
-            return False
+        if party_size is not None:
+            if self.min_party_size and party_size < self.min_party_size:
+                return False
+            if self.max_party_size and party_size > self.max_party_size:
+                return False
 
         # 5. Duración (si aplica)
         if duration_minutes:
@@ -84,18 +85,40 @@ class ServicePriceRule(Entity[UUID]):
 
         return True
 
-    def calculate_estimate(self, party_size: int = 1) -> PriceEstimate:
-        """Calcula el monto del estimado informativo."""
+    def calculate_estimate(self, party_size: Optional[int] = None) -> PriceEstimate:
+        """
+        Calcula el monto o la tipificación del estimado informativo.
+        - Si la regla es PER_PERSON:
+          * Si party_size es provisto y > 0: total_amount = amount * party_size
+          * Si party_size no es provisto: total_amount = None (tarifa unitaria por persona)
+        - Si la regla es PER_BOOKING:
+          * total_amount = amount
+        """
+        unit_amount = self.amount
+        total_amount: Optional[Decimal] = None
+
         if self.calculation_basis == CalculationBasis.PER_PERSON:
-            total_amount = self.amount * Decimal(party_size)
+            if party_size is not None and party_size > 0:
+                total_amount = self.amount * Decimal(party_size)
+                formatted = (
+                    f"{total_amount:.2f} {self.currency} "
+                    f"({self.amount:.2f} {self.currency} x {party_size} personas)"
+                )
+            else:
+                total_amount = None
+                formatted = f"{self.amount:.2f} {self.currency} por persona"
         else:
             total_amount = self.amount
+            formatted = f"{self.amount:.2f} {self.currency} por reserva"
 
         return PriceEstimate(
-            amount=total_amount,
+            amount=total_amount if total_amount is not None else unit_amount,
+            unit_amount=unit_amount,
+            total_amount=total_amount,
             currency=self.currency,
             basis=self.calculation_basis,
             label=self.label,
             rule_id=self.id,
             informative=True,
+            formatted=formatted,
         )

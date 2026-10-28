@@ -697,7 +697,10 @@ def test_service_price_rule_dimension_conditions_pga_golf():
 
     est_champ = rule_championship.calculate_estimate(party_size=2)
     assert est_champ.amount == Decimal("570.00")
+    assert est_champ.unit_amount == Decimal("285.00")
+    assert est_champ.total_amount == Decimal("570.00")
     assert est_champ.currency == "USD"
+    assert "x 2 personas" in est_champ.formatted
 
     # 2. Filtros para Par 3 Course con 3 jugadores
     filters_par3 = {"course": "par 3 course", "party_size": 3}
@@ -706,4 +709,112 @@ def test_service_price_rule_dimension_conditions_pga_golf():
 
     est_par3 = rule_par3.calculate_estimate(party_size=3)
     assert est_par3.amount == Decimal("165.00")
+    assert est_par3.unit_amount == Decimal("55.00")
+    assert est_par3.total_amount == Decimal("165.00")
     assert est_par3.currency == "USD"
+
+    # 3. Sin party_size (ej. tipificación unitaria informativa cuando party_size es desconocido)
+    est_unit_only = rule_championship.calculate_estimate(party_size=None)
+    assert est_unit_only.unit_amount == Decimal("285.00")
+    assert est_unit_only.total_amount is None
+    assert est_unit_only.amount == Decimal("285.00")
+    assert est_unit_only.formatted == "285.00 USD por persona"
+
+
+@pytest.mark.asyncio
+async def test_check_availability_per_person_without_party_size_returns_typification(
+    sample_service, sample_establishment, sample_contract, mock_token_codec
+):
+    """
+    Verifica que para reglas PER_PERSON donde party_size no viene en filters,
+    el slot devuelve la tipificación unitaria (unit_amount) con total_amount=None.
+    """
+    today = date.today()
+    slot_dt = datetime.combine(today, datetime.min.time()).replace(
+        hour=10, minute=0, tzinfo=timezone.utc
+    )
+
+    per_person_rule = ServicePriceRule(
+        service_id=20,
+        label="Tarifa Green Fee",
+        weekdays=[1, 2, 3, 4, 5, 6, 7],
+        start_minute=480,
+        end_minute=1320,
+        valid_from=date(2026, 1, 1),
+        amount=Decimal("285.00"),
+        currency="USD",
+        calculation_basis=CalculationBasis.PER_PERSON,
+        priority=10,
+    )
+
+    raw_cached_slots = [
+        {
+            "offer_ref": "off_golf_10am",
+            "slot_start": slot_dt.isoformat(),
+            "slot_end": (slot_dt + timedelta(hours=4)).isoformat(),
+            "resource_ref": "tee_1",
+            "resource_name": "Tee 1",
+            "is_estimated": False,
+        }
+    ]
+
+    mock_catalog = MagicMock()
+    mock_catalog.get_by_id = AsyncMock(return_value=sample_service)
+    mock_contract = MagicMock()
+    mock_contract.get_active_by_service_id = AsyncMock(return_value=sample_contract)
+    mock_contract.list_price_rules_for_service = AsyncMock(return_value=[per_person_rule])
+    mock_est = MagicMock()
+    mock_est.get_by_id = AsyncMock(return_value=sample_establishment)
+    mock_cache = MagicMock()
+    mock_cache.get = AsyncMock(return_value={"slots": raw_cached_slots})
+    mock_hold = MagicMock()
+    mock_hold.is_held = AsyncMock(return_value=False)
+    mock_bus = MagicMock()
+
+    use_case = CheckAvailabilityUseCase(
+        establishment_repo=mock_est,
+        catalog_service_repo=mock_catalog,
+        contract_repo=mock_contract,
+        avail_cache=mock_cache,
+        hold_manager=mock_hold,
+        bus_client=mock_bus,
+        token_codec=mock_token_codec,
+    )
+
+    # Consulta SIN party_size
+    res = await use_case.execute(
+        CheckAvailabilityQueryDTO(
+            service_id=20,
+            date=today,
+            user_uuid=uuid4(),
+            filters={},
+        )
+    )
+
+    assert res.status == "completed"
+    assert len(res.slots) == 1
+    slot = res.slots[0]
+    assert slot.price_estimate is not None
+    assert slot.price_estimate.unit_amount == Decimal("285.00")
+    assert slot.price_estimate.total_amount is None
+    assert slot.price_estimate.formatted == "285.00 USD por persona"
+
+    # Consulta CON party_size=2 en filters
+    res_with_party = await use_case.execute(
+        CheckAvailabilityQueryDTO(
+            service_id=20,
+            date=today,
+            user_uuid=uuid4(),
+            filters={"party_size": 2},
+        )
+    )
+
+    assert res_with_party.status == "completed"
+    assert len(res_with_party.slots) == 1
+    slot_party = res_with_party.slots[0]
+    assert slot_party.price_estimate is not None
+    assert slot_party.price_estimate.unit_amount == Decimal("285.00")
+    assert slot_party.price_estimate.total_amount == Decimal("570.00")
+    assert slot_party.price_estimate.amount == Decimal("570.00")
+    assert "285.00 USD x 2 personas" in slot_party.price_estimate.formatted
+

@@ -73,7 +73,9 @@ def register_availability_tools(server: MCPServer) -> None:
                     "slot_type": s.slot_type,
                     "notice": s.notice,
                     "price_estimate": {
-                        "amount": str(s.price_estimate.amount),
+                        "amount": str(s.price_estimate.amount) if s.price_estimate.amount is not None else None,
+                        "unit_amount": str(s.price_estimate.unit_amount) if s.price_estimate.unit_amount is not None else None,
+                        "total_amount": str(s.price_estimate.total_amount) if s.price_estimate.total_amount is not None else None,
                         "currency": s.price_estimate.currency,
                         "calculation_basis": s.price_estimate.calculation_basis,
                         "rule_label": s.price_estimate.rule_label,
@@ -141,10 +143,15 @@ def register_availability_tools(server: MCPServer) -> None:
                     "slot_type": s.slot_type,
                     "notice": s.notice,
                     "price_estimate": {
-                        "amount": str(s.price_estimate.amount),
+                        "amount": str(s.price_estimate.amount) if s.price_estimate.amount is not None else None,
+                        "unit_amount": str(s.price_estimate.unit_amount) if s.price_estimate.unit_amount is not None else None,
+                        "total_amount": str(s.price_estimate.total_amount) if s.price_estimate.total_amount is not None else None,
                         "currency": s.price_estimate.currency,
                         "calculation_basis": s.price_estimate.calculation_basis,
                         "rule_label": s.price_estimate.rule_label,
+                        "is_starting_price": s.price_estimate.is_starting_price,
+                        "tax_included": s.price_estimate.tax_included,
+                        "formatted": s.price_estimate.formatted,
                     }
                     if s.price_estimate
                     else None,
