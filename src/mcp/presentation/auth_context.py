@@ -125,7 +125,18 @@ def extract_user_context(
         except ValueError:
             raise AuthenticationRequiredException("Cabecera X-User-UUID inválida (no es un UUID válido).")
 
-    # 5. Si no se proporcionaron credenciales
+    # 5. Modo de desarrollo local (ej. Claude Desktop vía stdio sin OAuth)
+    settings = get_settings()
+    if settings.DEV_MODE:
+        dev_uuid = settings.DEV_USER_UUID or UUID("00000000-0000-0000-0000-000000000001")
+        return AuthenticatedUser(
+            user_uuid=dev_uuid,
+            phone_number=settings.DEV_USER_PHONE or "+18094251911",
+            email=settings.DEV_USER_EMAIL or "usuario.dev@example.com",
+            scopes=["bookings:read", "bookings:write"],
+        )
+
+    # 6. Si no se proporcionaron credenciales y no está en DEV_MODE
     raise AuthenticationRequiredException(
         "Autenticación requerida: debes suministrar un token OAuth 2.0 válido mediante 'Authorization: Bearer <jwt>'."
     )

@@ -210,6 +210,27 @@ def test_auth_context_extracts_phone_number_from_dev_headers():
     assert user.phone_number == "+34912345678"
 
 
+def test_auth_context_dev_mode_fallback(monkeypatch):
+    """Prueba que extract_user_context resuelve usuario fijo cuando DEV_MODE está activo y no hay headers."""
+    from src.mcp.presentation.auth_context import extract_user_context
+    from src.shared.config.settings import get_settings
+
+    current_user_context.set(None)
+    dev_id = uuid4()
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "DEV_MODE", True)
+    monkeypatch.setattr(settings, "DEV_USER_UUID", dev_id)
+    monkeypatch.setattr(settings, "DEV_USER_PHONE", "+18094251911")
+    monkeypatch.setattr(settings, "DEV_USER_EMAIL", "juan.perez@example.com")
+
+    user = extract_user_context(None, required_scope="bookings:write")
+    assert user.user_uuid == dev_id
+    assert user.phone_number == "+18094251911"
+    assert user.email == "juan.perez@example.com"
+    assert "bookings:write" in user.scopes
+
+
 # =========================================================================
 # 3. Invocación de Tools de Catálogo y Contratos
 # =========================================================================

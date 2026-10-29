@@ -1,4 +1,6 @@
 from functools import lru_cache
+from typing import Optional
+from uuid import UUID
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -16,6 +18,24 @@ class Settings(BaseSettings):
     DEBUG: bool = Field(default=True)
     HOST: str = Field(default="0.0.0.0")
     PORT: int = Field(default=8000)
+
+    # Modo de desarrollo y pruebas locales (Claude Desktop por stdio sin OAuth)
+    DEV_MODE: bool = Field(
+        default=False,
+        description="Si es True, permite llamadas locales sin token OAuth usando DEV_USER_*",
+    )
+    DEV_USER_UUID: Optional[UUID] = Field(
+        default=None,
+        description="UUID de usuario fijo para pruebas locales (ej. 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11')",
+    )
+    DEV_USER_PHONE: Optional[str] = Field(
+        default=None,
+        description="Teléfono de prueba fijo en formato E.164 (ej. '+18094251911')",
+    )
+    DEV_USER_EMAIL: Optional[str] = Field(
+        default=None,
+        description="Email de prueba fijo (ej. 'juan.perez@example.com')",
+    )
 
     # Base de Datos PostgreSQL (ATLAS-BACKEND)
     DATABASE_URL: str = Field(
