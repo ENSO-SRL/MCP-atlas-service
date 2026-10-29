@@ -675,6 +675,7 @@ def test_service_price_rule_dimension_conditions_pga_golf():
     rule_championship = ServicePriceRule(
         service_id=20,
         label="Tarifa Championship (18 hoyos)",
+        valid_from=date(2026, 1, 1),
         amount=Decimal("285.00"),
         currency="USD",
         calculation_basis=CalculationBasis.PER_PERSON,
@@ -684,6 +685,7 @@ def test_service_price_rule_dimension_conditions_pga_golf():
     rule_par3 = ServicePriceRule(
         service_id=20,
         label="Tarifa Par 3 Course (9 hoyos)",
+        valid_from=date(2026, 1, 1),
         amount=Decimal("55.00"),
         currency="USD",
         calculation_basis=CalculationBasis.PER_PERSON,
