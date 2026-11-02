@@ -56,7 +56,38 @@ BEGIN
             '{
                 "$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
+                "required": ["name", "last_name", "email", "gender", "country", "birth_date"],
                 "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Nombre de pila del titular de la reserva"
+                    },
+                    "last_name": {
+                        "type": "string",
+                        "description": "Apellido del titular de la reserva"
+                    },
+                    "email": {
+                        "type": "string",
+                        "format": "email",
+                        "description": "Correo electrónico de contacto y confirmación"
+                    },
+                    "gender": {
+                        "type": "string",
+                        "enum": ["H", "M"],
+                        "description": "Género del jugador: H (Hombre) o M (Mujer)"
+                    },
+                    "country": {
+                        "type": "string",
+                        "enum": ["DOM"],
+                        "default": "DOM",
+                        "description": "Código de país del titular (ISO 3166-1 alpha-3). Actualmente solo se acepta DOM."
+                    },
+                    "birth_date": {
+                        "type": "string",
+                        "format": "date",
+                        "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+                        "description": "Fecha de nacimiento del titular en formato YYYY-MM-DD (ej. 1990-05-15)"
+                    },
                     "guests": {
                         "type": "array",
                         "description": "Lista de acompañantes (obligatorio si hay más de 1 jugador). Cada acompañante debe indicar firstName y lastName.",
@@ -86,7 +117,38 @@ BEGIN
             booking_fields_schema = '{
                 "$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
+                "required": ["name", "last_name", "email", "gender", "country", "birth_date"],
                 "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Nombre de pila del titular de la reserva"
+                    },
+                    "last_name": {
+                        "type": "string",
+                        "description": "Apellido del titular de la reserva"
+                    },
+                    "email": {
+                        "type": "string",
+                        "format": "email",
+                        "description": "Correo electrónico de contacto y confirmación"
+                    },
+                    "gender": {
+                        "type": "string",
+                        "enum": ["H", "M"],
+                        "description": "Género del jugador: H (Hombre) o M (Mujer)"
+                    },
+                    "country": {
+                        "type": "string",
+                        "enum": ["DOM"],
+                        "default": "DOM",
+                        "description": "Código de país del titular (ISO 3166-1 alpha-3). Actualmente solo se acepta DOM."
+                    },
+                    "birth_date": {
+                        "type": "string",
+                        "format": "date",
+                        "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+                        "description": "Fecha de nacimiento del titular en formato YYYY-MM-DD (ej. 1990-05-15)"
+                    },
                     "guests": {
                         "type": "array",
                         "description": "Lista de acompañantes (obligatorio si hay más de 1 jugador). Cada acompañante debe indicar firstName y lastName.",

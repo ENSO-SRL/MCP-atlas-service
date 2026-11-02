@@ -153,10 +153,12 @@ async def test_server_ctx_hidden_from_tool_input_schemas(server):
 # =========================================================================
 
 @pytest.mark.asyncio
-async def test_tool_call_without_auth_returns_error(server):
+async def test_tool_call_without_auth_returns_error(server, monkeypatch):
     """Prueba que si no hay usuario autenticado en contexto ni cabecera, se devuelva error estructurado."""
-    # Reset temporal del usuario en contexto
+    # Reset temporal del usuario en contexto y desactivar DEV_MODE para verificar validación estricta
     current_user_context.set(None)
+    settings = get_settings()
+    monkeypatch.setattr(settings, "DEV_MODE", False)
 
     result = await server.call_tool("search_businesses", {"query": "Pádel"})
     text_content = result.content[0].text
@@ -514,3 +516,50 @@ def test_build_mcp_use_cases_factory():
     assert container.get_booking_status is not None
     assert container.list_my_bookings is not None
     assert container.cancel_booking is not None
+
+
+@pytest.mark.anyio
+async def test_main_run_server_dev_mode(monkeypatch):
+    """Verifica que en DEV_MODE main._run_server levante los workers en segundo plano."""
+    import main
+    from unittest.mock import AsyncMock, patch
+
+    mock_settings = MagicMock()
+    mock_settings.DEV_MODE = True
+    mock_settings.DEBUG = True
+    monkeypatch.setattr(main, "get_settings", lambda: mock_settings)
+
+    mock_run_stdio = AsyncMock()
+    monkeypatch.setattr(main.mcp_server, "run_stdio_async", mock_run_stdio)
+
+    mock_outbox = AsyncMock()
+    mock_outbox.run_forever = AsyncMock()
+    mock_inbox = AsyncMock()
+    mock_inbox.run_forever = AsyncMock()
+
+    with patch("src.mcp.infrastructure.workers.OutboxRelayWorker", return_value=mock_outbox), \
+         patch("src.mcp.infrastructure.workers.InboxConsumerWorker", return_value=mock_inbox):
+        await main._run_server()
+
+    mock_run_stdio.assert_awaited_once()
+    mock_outbox.run_forever.assert_awaited_once()
+    mock_inbox.run_forever.assert_awaited_once()
+
+
+@pytest.mark.anyio
+async def test_main_run_server_production_mode(monkeypatch):
+    """Verifica que sin DEV_MODE main._run_server solo ejecute el servidor stdio sin workers."""
+    import main
+    from unittest.mock import AsyncMock
+
+    mock_settings = MagicMock()
+    mock_settings.DEV_MODE = False
+    mock_settings.DEBUG = False
+    monkeypatch.setattr(main, "get_settings", lambda: mock_settings)
+
+    mock_run_stdio = AsyncMock()
+    monkeypatch.setattr(main.mcp_server, "run_stdio_async", mock_run_stdio)
+
+    await main._run_server()
+
+    mock_run_stdio.assert_awaited_once()
