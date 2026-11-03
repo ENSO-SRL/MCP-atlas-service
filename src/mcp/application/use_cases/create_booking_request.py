@@ -207,6 +207,7 @@ class CreateBookingRequestUseCase:
             "booking_id": str(booking.id),
             "user_uuid": str(booking.user_uuid),
             "user_phone": query.user_phone,
+            "user_email": query.user_email,
             "service_id": booking.service_id,
             "combo_code": combo_code,
             "contract_version_id": str(booking.contract_version_id),

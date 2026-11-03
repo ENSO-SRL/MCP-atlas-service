@@ -95,6 +95,7 @@ Para las consultas de lectura pesada o dinámica hacia upstream, el MCP utiliza 
     "combo_code": "PADEL_INDOOR",
     "user_uuid": "c4d7e231-1829-4d6b-9c71-332998822001",
     "user_phone": "+18095551234",
+    "user_email": "carlos.gomez@example.com",
     "date": "2026-10-28",
     "filters": {
       "course": "championsship",
@@ -219,6 +220,7 @@ Aplica para dimensiones cuyo contrato declara `values_source = "separate_query"`
     "combo_code": "TALLER_MEC_RAPIDA",
     "user_uuid": "c4d7e231-1829-4d6b-9c71-332998822001",
     "user_phone": "+18095551234",
+    "user_email": "carlos.gomez@example.com",
     "dimension_key": "mechanic",
     "context": {
       "date": "2026-10-28"
@@ -312,6 +314,7 @@ Emitido inmediatamente tras guardarse la solicitud de reserva en PostgreSQL.
     "booking_id": "b3e36e65-2244-4f01-9a99-123456789abc",
     "user_uuid": "c4d7e231-1829-4d6b-9c71-332998822001",
     "user_phone": "+18095551234",
+    "user_email": "carlos.gomez@example.com",
     "service_id": 20,
     "combo_code": "PADEL_INDOOR",
     "contract_version_id": "8f3b2100-3322-4411-8899-001122334455",
@@ -360,6 +363,7 @@ Emitido cuando el usuario solicita cancelar una reserva activa desde Claude.
     "booking_id": "b3e36e65-2244-4f01-9a99-123456789abc",
     "user_uuid": "c4d7e231-1829-4d6b-9c71-332998822001",
     "user_phone": "+18095551234",
+    "user_email": "carlos.gomez@example.com",
     "service_id": 20,
     "combo_code": "PADEL_INDOOR",
     "external_ref": "CONF-CLUB-9921",

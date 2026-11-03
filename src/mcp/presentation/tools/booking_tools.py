@@ -51,6 +51,7 @@ def register_booking_tools(server: MCPServer) -> None:
             service_id=service_id,
             fields=fields or {},
             user_phone=user.phone_number,
+            user_email=user.email,
         )
 
         async with get_mcp_use_cases() as uc:
@@ -196,6 +197,7 @@ def register_booking_tools(server: MCPServer) -> None:
             user_uuid=user.user_uuid,
             reason=reason,
             user_phone=user.phone_number,
+            user_email=user.email,
         )
 
         async with get_mcp_use_cases() as uc:
