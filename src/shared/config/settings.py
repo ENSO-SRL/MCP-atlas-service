@@ -77,7 +77,7 @@ class Settings(BaseSettings):
     OAUTH_JWT_ALGORITHM: str = Field(default="HS256")
     OAUTH_ACCESS_TOKEN_EXPIRE_SECONDS: int = Field(default=3600)  # 1 hora
     OAUTH_REFRESH_TOKEN_EXPIRE_DAYS: int = Field(default=30)
-    OAUTH_AUTH_CODE_EXPIRE_SECONDS: int = Field(default=60)  # 60 segundos
+    OAUTH_AUTH_CODE_EXPIRE_SECONDS: int = Field(default=300)  # 5 minutos para pruebas manuales o clientes remotos
 
     # MCP Slot Token Signing
     MCP_TOKEN_SECRET: str = Field(

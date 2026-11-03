@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+{% block title %}Iniciar Sesión | Atlas Business Hub{% endblock %}
+
+{% block content %}
+<div class="login-wrapper">
+  <!-- Wave backgrounds -->
+  <img src="/static/Isolation_Mode_01_OF.svg" alt="" class="login-wave login-wave--top">
+  <img src="/static/Isolation_Mode_05.svg" alt="" class="login-wave login-wave--bottom">
+
+  <div class="login-card">
+    <a href="/" class="login-logo-link">
+      <img src="/static/atlas.svg" alt="Atlas" class="logo-light">
+      <img src="/static/icons-02.png" alt="Atlas" class="logo-dark">
+    </a>
+
+    <h1 class="login-title">¡Bienvenido de nuevo!</h1>
+    <p class="login-subtitle">Inicia sesión en tu cuenta de Atlas</p>
+
+    {% if error_message %}
+    <div class="login-error-banner" role="alert">
+      {{ error_message }}
+    </div>
+    {% endif %}
+
+    <form method="POST" action="/oauth/login" style="width: 100%; display: flex; flex-direction: column; gap: 16px; align-items: center;">
+      <!-- Hidden OAuth Parameters -->
+      <input type="hidden" name="client_id" value="{{ client_id }}">
+      <input type="hidden" name="redirect_uri" value="{{ redirect_uri }}">
+      <input type="hidden" name="scope" value="{{ scope }}">
+      <input type="hidden" name="state" value="{{ state }}">
+      <input type="hidden" name="code_challenge" value="{{ code_challenge }}">
+      <input type="hidden" name="code_challenge_method" value="{{ code_challenge_method }}">
+
+      <div style="width: 100%;">
+        <label for="email" class="login-label">Correo electrónico *</label>
+        <input
+          id="email"
+          name="email"
+          type="email"
+          autocomplete="email"
+          placeholder="correo@ejemplo.com"
+          class="login-input"
+          required
+          autofocus
+          value="{{ email or '' }}"
+        >
+      </div>
+
+      <div style="width: 100%;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+          <label for="password" class="login-label" style="margin-bottom: 0;">Contraseña *</label>
+          <a href="https://atlasbusinesshub.com/forgot-password" target="_blank" rel="noopener" style="font-size: 13px; color: #666; text-decoration: none;" class="pink-link">
+            ¿Olvidaste la contraseña?
+          </a>
+        </div>
+
+        <div style="position: relative; width: 100%;">
+          <input
+            id="password"
+            name="password"
+            type="password"
+            autocomplete="current-password"
+            placeholder="••••••••"
+            class="login-input login-input--password"
+            required
+          >
+          <button
+            type="button"
+            id="password-toggle"
+            class="password-toggle-btn"
+            aria-label="Mostrar u ocultar contraseña"
+          >
+            <!-- Ojo tachado (oculto por defecto) -->
+            <svg id="eye-closed" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+              <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+              <line x1="1" y1="1" x2="23" y2="23" />
+            </svg>
+            <!-- Ojo abierto (visible) -->
+            <svg id="eye-open" style="display: none;" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <button type="submit" id="submit-btn" class="login-btn-outline">
+        Iniciar Sesión
+      </button>
+    </form>
+
+    <div class="login-links">
+      <p style="margin: 0;">
+        ¿No tienes cuenta?
+        <a href="https://atlasbusinesshub.com/signup" target="_blank" rel="noopener">Regístrate aquí</a>
+      </p>
+      <p style="margin: 0;">
+        Si no has confirmado,
+        <a href="https://atlasbusinesshub.com/resend-confirmation" target="_blank" rel="noopener">Confirma aquí</a>
+      </p>
+    </div>
+
+    <p class="login-legal">
+      Al iniciar sesión, aceptas nuestros
+      <a href="https://atlasbusinesshub.com/policies" target="_blank" rel="noopener">Términos y Condiciones</a>
+      y
+      <a href="https://atlasbusinesshub.com/policies" target="_blank" rel="noopener">Política de Privacidad</a>
+    </p>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function() {
+    const passwordInput = document.getElementById('password');
+    const toggleBtn = document.getElementById('password-toggle');
+    const eyeOpen = document.getElementById('eye-open');
+    const eyeClosed = document.getElementById('eye-closed');
+    const form = document.querySelector('form');
+    const submitBtn = document.getElementById('submit-btn');
+
+    if (toggleBtn && passwordInput) {
+      toggleBtn.addEventListener('click', function() {
+        const isPassword = passwordInput.getAttribute('type') === 'password';
+        passwordInput.setAttribute('type', isPassword ? 'text' : 'password');
+        eyeOpen.style.display = isPassword ? 'block' : 'none';
+        eyeClosed.style.display = isPassword ? 'none' : 'block';
+      });
+    }
+
+    if (form && submitBtn) {
+      form.addEventListener('submit', function() {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Iniciando sesión...';
+      });
+    }
+  })();
+</script>
+{% endblock %}

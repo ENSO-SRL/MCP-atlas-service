@@ -16,6 +16,11 @@ class PhoneNumberE164(ValueObject):
         if not self.value:
             raise ValueError("El número telefónico no puede ser vacío.")
         clean_value = self.value.strip()
+
+        # Limpiar prefijo de canal común 'whatsapp:' si viene de integraciones
+        if clean_value.lower().startswith("whatsapp:"):
+            clean_value = clean_value[9:].strip()
+
         if not _E164_REGEX.match(clean_value):
             raise ValueError(
                 f"El número telefónico '{self.value}' no cumple con el formato internacional E.164 "

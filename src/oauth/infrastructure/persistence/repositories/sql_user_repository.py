@@ -23,20 +23,35 @@ class SqlUserRepository(IUserRepository):
 
     @staticmethod
     def _to_domain(model: UserModel) -> User:
-        user_uuid = UUID(model.uuid) if isinstance(model.uuid, str) else model.uuid
+        user_uuid = UUID(str(model.uuid)) if model.uuid else UUID("00000000-0000-0000-0000-000000000000")
         role = UserRole.ADMIN if getattr(model, "role_id", None) == 1 else UserRole.USER
         phone = getattr(model, "phone", None)
-        phone_vo = PhoneNumberE164(phone) if phone else None
+        phone_vo: Optional[PhoneNumberE164] = None
+        if phone and phone.strip():
+            try:
+                phone_vo = PhoneNumberE164(phone)
+            except ValueError:
+                try:
+                    phone_vo = PhoneNumberE164(f"+{phone.strip()}")
+                except ValueError:
+                    phone_vo = None
+
+        email_str = (model.email or "").strip().lower()
+        try:
+            email_vo = EmailAddress(email_str)
+        except ValueError:
+            email_vo = EmailAddress("unknown@example.com")
+
         created_at = getattr(model, "created_at", None) or datetime.now(timezone.utc)
         updated_at = getattr(model, "updated_at", None) or datetime.now(timezone.utc)
 
         return User(
             id=model.id,
             uuid=user_uuid,
-            email=EmailAddress(model.email),
-            hashed_password=model.hashed_password,
-            name=model.name,
-            last_name=model.last_name,
+            email=email_vo,
+            hashed_password=model.hashed_password or "",
+            name=model.name or "",
+            last_name=model.last_name or "",
             phone=phone_vo,
             national_id=getattr(model, "national_id", None),
             gender=getattr(model, "gender", None),

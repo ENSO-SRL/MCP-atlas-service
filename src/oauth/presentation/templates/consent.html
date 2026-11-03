@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}Autorizar Aplicación | Atlas Business Hub{% endblock %}
+
+{% block content %}
+<div class="login-wrapper">
+  <!-- Wave backgrounds -->
+  <img src="/static/Isolation_Mode_01_OF.svg" alt="" class="login-wave login-wave--top">
+  <img src="/static/Isolation_Mode_05.svg" alt="" class="login-wave login-wave--bottom">
+
+  <div class="login-card">
+    <a href="/" class="login-logo-link">
+      <img src="/static/atlas.svg" alt="Atlas" class="logo-light">
+      <img src="/static/icons-02.png" alt="Atlas" class="logo-dark">
+    </a>
+
+    <h1 class="login-title">Autorizar Conexión</h1>
+    <p class="login-subtitle">Una aplicación solicita acceso a tu cuenta de Atlas Business Hub</p>
+
+    <!-- Client Info Badge -->
+    <div class="client-badge-card">
+      <div class="client-badge-avatar">
+        <!-- Icono de integración / IA -->
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+        </svg>
+      </div>
+      <div class="client-badge-info">
+        <span class="client-badge-name">{{ client_name or client_id }}</span>
+        <span class="client-badge-desc">Cliente verificado para Atlas MCP</span>
+      </div>
+    </div>
+
+    <!-- Active User Indicator -->
+    <p class="user-badge">
+      Conectado como <strong>{{ user_email }}</strong>
+    </p>
+
+    <!-- Scopes Breakdown -->
+    <div style="width: 100%;">
+      <span class="login-label" style="margin-bottom: 8px;">Permisos solicitados:</span>
+      <div class="scope-list">
+        {% for s in scopes_info %}
+        <div class="scope-item">
+          <svg class="scope-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          <div>
+            <p class="scope-item-title">{{ s.title }}</p>
+            <p class="scope-item-desc">{{ s.description }}</p>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Consent Form -->
+    <form method="POST" action="/oauth/consent" style="width: 100%; display: flex; flex-direction: column; gap: 12px; margin-top: 8px;">
+      <!-- Hidden OAuth Parameters -->
+      <input type="hidden" name="client_id" value="{{ client_id }}">
+      <input type="hidden" name="redirect_uri" value="{{ redirect_uri }}">
+      <input type="hidden" name="scope" value="{{ scope }}">
+      <input type="hidden" name="state" value="{{ state }}">
+      <input type="hidden" name="code_challenge" value="{{ code_challenge }}">
+      <input type="hidden" name="code_challenge_method" value="{{ code_challenge_method }}">
+
+      <button type="submit" name="action" value="allow" class="login-btn-solid">
+        Autorizar acceso
+      </button>
+
+      <button type="submit" name="action" value="deny" class="login-btn-secondary">
+        Cancelar y volver
+      </button>
+    </form>
+
+    <p class="login-legal">
+      Puedes revocar este acceso en cualquier momento desde tu panel de usuario o desconectando el conector MCP.
+    </p>
+  </div>
+</div>
+{% endblock %}

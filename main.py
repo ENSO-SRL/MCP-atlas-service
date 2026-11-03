@@ -42,7 +42,12 @@ async def _run_server() -> None:
 
 
 def main() -> None:
-    anyio.run(_run_server)
+    if len(sys.argv) > 1 and sys.argv[1].lower() in ("--oauth", "oauth", "--web", "web"):
+        import uvicorn
+        settings = get_settings()
+        uvicorn.run("src.oauth.presentation.app:app", host=settings.HOST, port=settings.PORT, reload=settings.DEBUG)
+    else:
+        anyio.run(_run_server)
 
 
 if __name__ == "__main__":

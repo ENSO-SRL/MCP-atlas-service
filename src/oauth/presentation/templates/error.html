@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}Error de Autorización | Atlas Business Hub{% endblock %}
+
+{% block content %}
+<div class="login-wrapper">
+  <!-- Wave backgrounds -->
+  <img src="/static/Isolation_Mode_01_OF.svg" alt="" class="login-wave login-wave--top">
+  <img src="/static/Isolation_Mode_05.svg" alt="" class="login-wave login-wave--bottom">
+
+  <div class="login-card">
+    <a href="/" class="login-logo-link">
+      <img src="/static/atlas.svg" alt="Atlas" class="logo-light">
+      <img src="/static/icons-02.png" alt="Atlas" class="logo-dark">
+    </a>
+
+    <h1 class="login-title" style="color: #E53E3E;">Error de Autorización</h1>
+    <p class="login-subtitle">No se pudo procesar la solicitud OAuth</p>
+
+    <div class="login-error-banner" style="text-align: left; font-size: 14px; line-height: 1.5; padding: 14px 18px;" role="alert">
+      <strong>{{ error_code or 'invalid_request' }}:</strong>
+      <p style="margin: 6px 0 0 0;">{{ error_description or 'Ocurrió un error inesperado al validar la solicitud.' }}</p>
+    </div>
+
+    <a href="/" class="login-btn-outline" style="margin-top: 12px;">
+      Volver al inicio
+    </a>
+  </div>
+</div>
+{% endblock %}
