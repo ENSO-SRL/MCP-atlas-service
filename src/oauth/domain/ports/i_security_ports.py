@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Optional
 from uuid import UUID
 
 
@@ -24,7 +24,11 @@ class ITokenIssuer(ABC):
 
     @abstractmethod
     def create_access_token(
-        self, user_uuid: UUID, scope: str, expires_in_seconds: int = 3600
+        self,
+        user_uuid: UUID,
+        scope: str,
+        expires_in_seconds: int = 3600,
+        extra_claims: Optional[dict[str, Any]] = None,
     ) -> str:
         """Emite y firma un token JWT con los claims requeridos."""
         pass
@@ -33,3 +37,4 @@ class ITokenIssuer(ABC):
     def decode_and_validate_access_token(self, token_str: str) -> dict[str, Any]:
         """Decodifica y valida firma, emisor y expiración del JWT."""
         pass
+
