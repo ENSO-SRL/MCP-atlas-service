@@ -86,6 +86,7 @@ def register_availability_tools(server: MCPServer) -> None:
                     if s.price_estimate
                     else None,
                     "attributes": s.attributes,
+                    "applied_filters": s.applied_filters,
                 }
                 for s in res.slots
             ],
@@ -156,6 +157,7 @@ def register_availability_tools(server: MCPServer) -> None:
                     if s.price_estimate
                     else None,
                     "attributes": s.attributes,
+                    "applied_filters": s.applied_filters,
                 }
                 for s in res.slots
             ]

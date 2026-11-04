@@ -90,11 +90,32 @@ async def process_raw_slots(
                 "automáticamente el horario cuando el club lo publique el día previo."
             )
 
-        # 3. Estimación de precio
+        # Consolidar filtros del slot: base upstream + nuevos atributos del slot particular
+        slot_applied_filters = dict(applied_filters)
+        raw_attributes = item.get("attributes", {})
+        if isinstance(raw_attributes, dict):
+            for attr_key, attr_val in raw_attributes.items():
+                if attr_key not in slot_applied_filters and attr_val is not None:
+                    slot_applied_filters[attr_key] = attr_val
+
+        slot_party_size = evaluated_party_size
+        if slot_party_size is None:
+            if "party_size" in slot_applied_filters:
+                try:
+                    slot_party_size = int(slot_applied_filters["party_size"])
+                except (ValueError, TypeError):
+                    slot_party_size = None
+            elif "players" in slot_applied_filters:
+                try:
+                    slot_party_size = int(slot_applied_filters["players"])
+                except (ValueError, TypeError):
+                    slot_party_size = None
+
+        # 3. Estimación de precio evaluada sobre el contexto consolidado del slot
         price_dto: Optional[SlotPriceEstimateDTO] = None
         for rule in sorted(price_rules, key=lambda r: r.priority, reverse=True):
-            if rule.is_applicable(slot_start, party_size=evaluated_party_size, applied_filters=applied_filters):
-                estimate = rule.calculate_estimate(party_size=evaluated_party_size)
+            if rule.is_applicable(slot_start, party_size=slot_party_size, applied_filters=slot_applied_filters):
+                estimate = rule.calculate_estimate(party_size=slot_party_size)
                 price_dto = SlotPriceEstimateDTO(
                     amount=estimate.amount,
                     unit_amount=estimate.unit_amount,
@@ -108,7 +129,7 @@ async def process_raw_slots(
                 )
                 break
 
-        # 4. Acuñación del SlotToken criptográfico
+        # 4. Acuñación del SlotToken criptográfico con applied_filters enriquecidos
         token_id = f"tok_{uuid4().hex[:12]}"
         expires_at = datetime.now(timezone.utc) + timedelta(seconds=contract.request_ttl_seconds)
 
@@ -121,7 +142,7 @@ async def process_raw_slots(
             slot_end=slot_end,
             contract_version=contract_version_label,
             expires_at=expires_at,
-            applied_filters=applied_filters,
+            applied_filters=slot_applied_filters,
             is_estimated=is_estimated,
         )
 
@@ -137,7 +158,8 @@ async def process_raw_slots(
                 slot_type=slot_type,
                 notice=notice,
                 price_estimate=price_dto,
-                attributes=item.get("attributes", {}),
+                attributes=raw_attributes,
+                applied_filters=slot_applied_filters,
             )
         )
 

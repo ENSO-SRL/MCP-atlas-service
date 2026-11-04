@@ -80,7 +80,8 @@ class ServicePriceRule(Entity[UUID]):
             if not applied_filters:
                 return False
             for cond_key, cond_val in self.dimension_conditions.items():
-                if applied_filters.get(cond_key) != cond_val:
+                val = applied_filters.get(cond_key)
+                if val is None or (val != cond_val and str(val).strip().lower() != str(cond_val).strip().lower()):
                     return False
 
         return True

@@ -820,3 +820,116 @@ async def test_check_availability_per_person_without_party_size_returns_typifica
     assert slot_party.price_estimate.amount == Decimal("570.00")
     assert "285.00 USD x 2 personas" in slot_party.price_estimate.formatted
 
+
+@pytest.mark.asyncio
+async def test_process_raw_slots_merges_slot_attributes_with_applied_filters(mock_token_codec):
+    """
+    Verifica que cada slot combine los filtros upstream con los atributos nuevos del slot particular,
+    sin pisar los filtros existentes, resolviendo las tarifas dinámicas y sellando el slot_token correctamente.
+    """
+    from src.mcp.application.use_cases.check_availability import process_raw_slots
+
+    token_codec = mock_token_codec
+    service_id = 9
+    user_uuid = uuid4()
+    contract = ServiceContractVersion(
+        id=uuid4(),
+        service_id=service_id,
+        version_no=1,
+        status=ContractStatus.PUBLISHED,
+        pattern=AvailabilityPattern.SLOT_OBJECT,
+        request_ttl_seconds=900,
+    )
+
+    rule_18h = ServicePriceRule(
+        service_id=service_id,
+        label="Campo Senior - 18 Hoyos",
+        amount=Decimal("1750.00"),
+        currency="DOP",
+        calculation_basis=CalculationBasis.PER_PERSON,
+        valid_from=date(2026, 1, 1),
+        dimension_conditions={"course": "Campo Senior", "holes": "18"},
+        priority=10,
+    )
+    rule_9h = ServicePriceRule(
+        service_id=service_id,
+        label="Campo Senior - 9 Hoyos",
+        amount=Decimal("1300.00"),
+        currency="DOP",
+        calculation_basis=CalculationBasis.PER_PERSON,
+        valid_from=date(2026, 1, 1),
+        dimension_conditions={"course": "Campo Senior", "holes": "9"},
+        priority=10,
+    )
+
+    mock_hold = MagicMock()
+    mock_hold.is_held = AsyncMock(return_value=False)
+
+    raw_slots = [
+        {
+            "offer_ref": "slot-senior-18h",
+            "slot_start": "2026-03-26T08:00:00Z",
+            "slot_end": "2026-03-26T12:00:00Z",
+            "attributes": {"course": "OVERWRITE_ATTEMPT", "holes": 18},
+        },
+        {
+            "offer_ref": "slot-senior-9h",
+            "slot_start": "2026-03-26T08:30:00Z",
+            "slot_end": "2026-03-26T10:30:00Z",
+            "attributes": {"holes": 9},
+        },
+    ]
+
+    applied_filters = {"course": "Campo Senior", "party_size": 2}
+
+    slots = await process_raw_slots(
+        raw_slots=raw_slots,
+        service_id=service_id,
+        contract=contract,
+        user_uuid=user_uuid,
+        applied_filters=applied_filters,
+        hold_manager=mock_hold,
+        token_codec=token_codec,
+        price_rules=[rule_18h, rule_9h],
+    )
+
+    assert len(slots) == 2
+
+    # Slot 1 (18 hoyos):
+    s1 = slots[0]
+    assert s1.applied_filters["course"] == "Campo Senior"  # No fue pisado por OVERWRITE_ATTEMPT
+    assert s1.applied_filters["party_size"] == 2
+    assert s1.applied_filters["holes"] == 18  # Nuevo atributo agregado
+    assert s1.attributes == {"course": "OVERWRITE_ATTEMPT", "holes": 18}  # Atributos crudos intactos
+    assert s1.price_estimate is not None
+    assert s1.price_estimate.unit_amount == Decimal("1750.00")
+    assert s1.price_estimate.total_amount == Decimal("3500.00")  # 1750 * 2 jugadores
+    assert s1.price_estimate.currency == "DOP"
+
+    # Token de Slot 1 descifrado debe contener la combinación completa
+    decoded_token1 = token_codec.decode(s1.slot_token)
+    assert decoded_token1.applied_filters == {
+        "course": "Campo Senior",
+        "party_size": 2,
+        "holes": 18,
+    }
+
+    # Slot 2 (9 hoyos):
+    s2 = slots[1]
+    assert s2.applied_filters["course"] == "Campo Senior"
+    assert s2.applied_filters["party_size"] == 2
+    assert s2.applied_filters["holes"] == 9
+    assert s2.attributes == {"holes": 9}
+    assert s2.price_estimate is not None
+    assert s2.price_estimate.unit_amount == Decimal("1300.00")
+    assert s2.price_estimate.total_amount == Decimal("2600.00")  # 1300 * 2 jugadores
+    assert s2.price_estimate.currency == "DOP"
+
+    decoded_token2 = token_codec.decode(s2.slot_token)
+    assert decoded_token2.applied_filters == {
+        "course": "Campo Senior",
+        "party_size": 2,
+        "holes": 9,
+    }
+
+

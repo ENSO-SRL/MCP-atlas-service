@@ -47,6 +47,7 @@ class AvailableSlotDTO:
     notice: Optional[str] = None
     price_estimate: Optional[SlotPriceEstimateDTO] = None
     attributes: dict[str, Any] = field(default_factory=dict)
+    applied_filters: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
