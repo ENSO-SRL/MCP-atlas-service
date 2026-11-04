@@ -13,6 +13,10 @@ from src.mcp.application.use_cases.get_dimension_options import GetDimensionOpti
 from src.mcp.application.use_cases.get_operation_result import GetOperationResultUseCase
 from src.mcp.application.use_cases.get_service_contract import GetServiceContractUseCase
 from src.mcp.application.use_cases.list_my_bookings import ListMyBookingsUseCase
+from src.mcp.application.use_cases.operation_helpers import (
+    GENERIC_INTERNAL_ERROR_MESSAGE,
+    resolve_operation_error,
+)
 from src.mcp.application.use_cases.search_businesses import SearchBusinessesUseCase
 
 __all__ = [
@@ -28,4 +32,6 @@ __all__ = [
     "GetBookingStatusUseCase",
     "ListMyBookingsUseCase",
     "CancelBookingUseCase",
+    "GENERIC_INTERNAL_ERROR_MESSAGE",
+    "resolve_operation_error",
 ]

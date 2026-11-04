@@ -223,4 +223,5 @@ def register_catalog_tools(server: MCPServer) -> None:
             "operation_id": res.operation_id,
             "context_hash": res.context_hash,
             "expires_in_seconds": res.expires_in_seconds,
+            "error_message": res.error_message,
         }

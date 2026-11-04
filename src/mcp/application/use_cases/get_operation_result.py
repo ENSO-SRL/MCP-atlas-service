@@ -9,6 +9,7 @@ from src.mcp.application.dto.availability_dtos import (
 )
 from src.mcp.application.dto.contract_dtos import DimensionOptionDTO
 from src.mcp.application.use_cases.check_availability import process_raw_slots
+from src.mcp.application.use_cases.operation_helpers import resolve_operation_error
 from src.mcp.domain.ports.mcp_ports import (
     IContractRepository,
     IHoldManager,
@@ -70,12 +71,12 @@ class GetOperationResultUseCase:
 
         # 3. Si falló upstream
         if status == "failed":
+            error_msg, result_type = resolve_operation_error(raw_result, query.operation_id)
             return OperationResultResponseDTO(
                 status="failed",
                 operation_id=query.operation_id,
-                error_message=raw_result.get(
-                    "error", "La operación falló durante el procesamiento en el backend externo."
-                ),
+                result_type=result_type,
+                error_message=error_msg,
             )
 
         # 4. Operación completada: determinar si fue de dimensión o de disponibilidad

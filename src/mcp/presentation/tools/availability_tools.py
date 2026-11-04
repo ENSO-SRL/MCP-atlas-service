@@ -92,6 +92,7 @@ def register_availability_tools(server: MCPServer) -> None:
             ],
             "applied_filters": res.applied_filters,
             "message": res.message,
+            "error_message": res.message if res.status == "failed" else None,
         }
 
     @server.tool(

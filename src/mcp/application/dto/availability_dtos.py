@@ -53,7 +53,7 @@ class AvailableSlotDTO:
 @dataclass
 class AvailabilityResponseDTO:
     """Respuesta consolidada de disponibilidad."""
-    status: str  # "completed" | "processing"
+    status: str  # "completed" | "processing" | "failed"
     service_id: int
     slots: list[AvailableSlotDTO] = field(default_factory=list)
     operation_id: Optional[str] = None

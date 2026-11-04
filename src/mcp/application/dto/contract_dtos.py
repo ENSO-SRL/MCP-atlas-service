@@ -62,9 +62,10 @@ class GetDimensionOptionsQueryDTO:
 @dataclass
 class DimensionOptionsResponseDTO:
     """Respuesta a la resolución de opciones de una dimensión."""
-    status: str  # "completed" | "processing"
+    status: str  # "completed" | "processing" | "failed"
     dimension_key: str
     options: list[DimensionOptionDTO] = field(default_factory=list)
     operation_id: Optional[str] = None
     context_hash: Optional[str] = None
     expires_in_seconds: Optional[int] = None
+    error_message: Optional[str] = None

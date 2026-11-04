@@ -8,6 +8,7 @@ from src.mcp.application.dto.contract_dtos import (
     DimensionOptionsResponseDTO,
     GetDimensionOptionsQueryDTO,
 )
+from src.mcp.application.use_cases.operation_helpers import resolve_operation_error
 from src.mcp.domain.enums.mcp_enums import DimensionValuesSource
 from src.mcp.domain.exceptions.mcp_exceptions import (
     EntityNotFoundException,
@@ -129,6 +130,17 @@ class GetDimensionOptionsUseCase:
         immediate_result = await self._bus_client.wait_for_response(response_key, timeout_seconds=2.0)
 
         if immediate_result is not None:
+            # Comprobar si falló upstream
+            if immediate_result.get("status") == "failed":
+                error_msg, _ = resolve_operation_error(immediate_result, operation_id)
+                return DimensionOptionsResponseDTO(
+                    status="failed",
+                    dimension_key=query.dimension_key,
+                    operation_id=operation_id,
+                    context_hash=context_hash,
+                    error_message=error_msg,
+                )
+
             # Llegó respuesta dentro de la ventana de 2 segundos
             raw_options = immediate_result.get("options", [])
             await self._dim_cache.set(

@@ -11,6 +11,7 @@ from src.mcp.application.dto.availability_dtos import (
     CheckAvailabilityQueryDTO,
     SlotPriceEstimateDTO,
 )
+from src.mcp.application.use_cases.operation_helpers import resolve_operation_error
 from src.mcp.domain.entities.contract_entities import ServiceContractVersion
 from src.mcp.domain.entities.service_price_rule import ServicePriceRule
 from src.mcp.domain.enums.mcp_enums import AvailabilityPattern
@@ -268,6 +269,19 @@ class CheckAvailabilityUseCase:
             immediate_result = await self._bus_client.wait_for_response(response_key, timeout_seconds=2.0)
 
             if immediate_result is not None:
+                # Comprobar si falló upstream
+                if immediate_result.get("status") == "failed":
+                    error_msg, _ = resolve_operation_error(immediate_result, operation_id)
+                    return AvailabilityResponseDTO(
+                        status="failed",
+                        service_id=query.service_id,
+                        slots=[],
+                        operation_id=operation_id,
+                        applied_filters=query.filters,
+                        filter_hash=filter_hash,
+                        message=error_msg,
+                    )
+
                 raw_slots = immediate_result.get("slots", [])
                 await self._avail_cache.set(
                     query.service_id,

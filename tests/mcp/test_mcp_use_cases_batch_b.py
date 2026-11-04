@@ -13,6 +13,7 @@ from src.mcp.application.dto.availability_dtos import (
 )
 from src.mcp.application.use_cases.check_availability import CheckAvailabilityUseCase
 from src.mcp.application.use_cases.get_operation_result import GetOperationResultUseCase
+from src.mcp.application.use_cases.operation_helpers import GENERIC_INTERNAL_ERROR_MESSAGE
 from src.mcp.domain.entities.catalog_entities import CatalogService, Establishment
 from src.mcp.domain.entities.contract_entities import ServiceContractVersion
 from src.mcp.domain.entities.service_price_rule import ServicePriceRule
@@ -406,6 +407,119 @@ async def test_check_availability_cache_miss_timeout_returns_processing(
 
 
 @pytest.mark.asyncio
+async def test_check_availability_immediate_failed_internal_error(
+    sample_service, sample_establishment, sample_contract, sample_price_rule, mock_token_codec, caplog
+):
+    """Prueba que un fallo 'internal_error' en espera superficial inmediata no puebla caché y devuelve mensaje genérico."""
+    today = date.today()
+
+    mock_catalog = MagicMock()
+    mock_catalog.get_by_id = AsyncMock(return_value=sample_service)
+    mock_contract = MagicMock()
+    mock_contract.get_active_by_service_id = AsyncMock(return_value=sample_contract)
+    mock_est = MagicMock()
+    mock_est.get_by_id = AsyncMock(return_value=sample_establishment)
+
+    mock_cache = MagicMock()
+    mock_cache.get = AsyncMock(return_value=None)
+    mock_cache.set = AsyncMock()
+    mock_hold = MagicMock()
+
+    mock_bus = MagicMock()
+    mock_bus.publish_availability_request = AsyncMock()
+    mock_bus.wait_for_response = AsyncMock(
+        return_value={
+            "operation_id": "op_imm_fail",
+            "status": "failed",
+            "result_type": "internal_error",
+            "detail": "Database connection pool exhausted upstream",
+            "error": "Database connection pool exhausted upstream",
+        }
+    )
+
+    use_case = CheckAvailabilityUseCase(
+        establishment_repo=mock_est,
+        catalog_service_repo=mock_catalog,
+        contract_repo=mock_contract,
+        avail_cache=mock_cache,
+        hold_manager=mock_hold,
+        bus_client=mock_bus,
+        token_codec=mock_token_codec,
+    )
+
+    with caplog.at_level("ERROR"):
+        res = await use_case.execute(
+            CheckAvailabilityQueryDTO(
+                service_id=20,
+                date=today,
+                user_uuid=uuid4(),
+            )
+        )
+
+    assert res.status == "failed"
+    assert len(res.slots) == 0
+    assert "dificultades técnicas" in res.message
+    assert "Database connection pool exhausted" not in res.message
+    assert "Database connection pool exhausted" in caplog.text
+    mock_cache.set.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_check_availability_immediate_failed_error_to_user(
+    sample_service, sample_establishment, sample_contract, sample_price_rule, mock_token_codec
+):
+    """Prueba que un fallo 'error_to_user' en espera superficial inmediata propaga el detail exacto."""
+    today = date.today()
+
+    mock_catalog = MagicMock()
+    mock_catalog.get_by_id = AsyncMock(return_value=sample_service)
+    mock_contract = MagicMock()
+    mock_contract.get_active_by_service_id = AsyncMock(return_value=sample_contract)
+    mock_est = MagicMock()
+    mock_est.get_by_id = AsyncMock(return_value=sample_establishment)
+
+    mock_cache = MagicMock()
+    mock_cache.get = AsyncMock(return_value=None)
+    mock_cache.set = AsyncMock()
+    mock_hold = MagicMock()
+
+    mock_bus = MagicMock()
+    mock_bus.publish_availability_request = AsyncMock()
+    mock_bus.wait_for_response = AsyncMock(
+        return_value={
+            "operation_id": "op_imm_usr",
+            "status": "failed",
+            "result_type": "error_to_user",
+            "detail": "El socio no tiene cuotas al día para reservar en esta fecha.",
+            "error": "El socio no tiene cuotas al día para reservar en esta fecha.",
+        }
+    )
+
+    use_case = CheckAvailabilityUseCase(
+        establishment_repo=mock_est,
+        catalog_service_repo=mock_catalog,
+        contract_repo=mock_contract,
+        avail_cache=mock_cache,
+        hold_manager=mock_hold,
+        bus_client=mock_bus,
+        token_codec=mock_token_codec,
+    )
+
+    res = await use_case.execute(
+        CheckAvailabilityQueryDTO(
+            service_id=20,
+            date=today,
+            user_uuid=uuid4(),
+        )
+    )
+
+    assert res.status == "failed"
+    assert len(res.slots) == 0
+    assert res.message == "El socio no tiene cuotas al día para reservar en esta fecha."
+    mock_cache.set.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_get_operation_result_not_found(mock_token_codec):
     mock_bus = MagicMock()
     mock_bus.get_operation_result = AsyncMock(return_value=None)
@@ -430,6 +544,99 @@ async def test_get_operation_result_not_found(mock_token_codec):
 
     assert res.status == "failed"
     assert "no existe o ha expirado" in res.error_message
+
+
+@pytest.mark.asyncio
+async def test_get_operation_result_failed_internal_error(mock_token_codec, caplog):
+    """
+    Prueba que una operación diferida fallida con 'internal_error' logea el detalle real,
+    devuelve el mensaje genérico seguro al usuario y no puebla la caché.
+    """
+    mock_bus = MagicMock()
+    mock_bus.get_operation_result = AsyncMock(
+        return_value={
+            "operation_id": "op_err_int",
+            "status": "failed",
+            "result_type": "internal_error",
+            "detail": "Connection to PMS timed out on socket 443",
+            "error": "Connection to PMS timed out on socket 443",
+        }
+    )
+    mock_contract = MagicMock()
+    mock_hold = MagicMock()
+    mock_avail = MagicMock()
+    mock_avail.set = AsyncMock()
+    mock_dim = MagicMock()
+    mock_dim.set = AsyncMock()
+
+    use_case = GetOperationResultUseCase(
+        bus_client=mock_bus,
+        contract_repo=mock_contract,
+        hold_manager=mock_hold,
+        token_codec=mock_token_codec,
+        avail_cache=mock_avail,
+        dim_cache=mock_dim,
+    )
+
+    with caplog.at_level("ERROR"):
+        res = await use_case.execute(
+            GetOperationResultQueryDTO(operation_id="op_err_int", user_uuid=uuid4())
+        )
+
+    assert res.status == "failed"
+    assert res.result_type == "internal_error"
+    assert "dificultades técnicas" in res.error_message
+    assert "Connection to PMS timed out" not in res.error_message
+    assert "Connection to PMS timed out" in caplog.text
+
+    # No debe poblar ninguna caché
+    mock_avail.set.assert_not_called()
+    mock_dim.set.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_get_operation_result_failed_error_to_user(mock_token_codec):
+    """
+    Prueba que una operación diferida fallida con 'error_to_user' devuelve el detalle
+    directamente al usuario y no puebla la caché.
+    """
+    mock_bus = MagicMock()
+    mock_bus.get_operation_result = AsyncMock(
+        return_value={
+            "operation_id": "op_err_usr",
+            "status": "failed",
+            "result_type": "error_to_user",
+            "detail": "El campo 'Campo Senior' no tiene horarios habilitados para esta fecha.",
+            "error": "El campo 'Campo Senior' no tiene horarios habilitados para esta fecha.",
+        }
+    )
+    mock_contract = MagicMock()
+    mock_hold = MagicMock()
+    mock_avail = MagicMock()
+    mock_avail.set = AsyncMock()
+    mock_dim = MagicMock()
+    mock_dim.set = AsyncMock()
+
+    use_case = GetOperationResultUseCase(
+        bus_client=mock_bus,
+        contract_repo=mock_contract,
+        hold_manager=mock_hold,
+        token_codec=mock_token_codec,
+        avail_cache=mock_avail,
+        dim_cache=mock_dim,
+    )
+
+    res = await use_case.execute(
+        GetOperationResultQueryDTO(operation_id="op_err_usr", user_uuid=uuid4())
+    )
+
+    assert res.status == "failed"
+    assert res.result_type == "error_to_user"
+    assert res.error_message == "El campo 'Campo Senior' no tiene horarios habilitados para esta fecha."
+
+    # No debe poblar ninguna caché
+    mock_avail.set.assert_not_called()
+    mock_dim.set.assert_not_called()
 
 
 @pytest.mark.asyncio
