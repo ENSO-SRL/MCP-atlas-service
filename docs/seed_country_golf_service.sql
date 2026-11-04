@@ -194,9 +194,9 @@ BEGIN
         'holes_preference',
         2,
         'Preferencia de Recorrido (Hoyos)',
-        'Seleccione si desea jugar 9 o 18 hoyos. Determina la tarifa oficial aplicable.',
+        'Seleccione si desea jugar 9 o 18 hoyos. Se envía como parámetro al upstream para filtrar los turnos y determina la tarifa oficial aplicable.',
         'inline',
-        'post_filter',
+        'upstream_param',
         true,
         false,
         false

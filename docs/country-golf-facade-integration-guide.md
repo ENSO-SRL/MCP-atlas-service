@@ -35,7 +35,7 @@ El conector MCP expone 3 dimensiones para este servicio:
 2. **`holes_preference` (Preferencia de Hoyos):**
    * `'18'` &rarr; Recorrido completo de 18 hoyos.
    * `'9'` &rarr; Recorrido corto de 9 hoyos.
-   * `apply_mode`: `'post_filter'` (define la regla tarifaria exacta y viaja sellado en el token).
+   * `apply_mode`: `'upstream_param'` (se envía como parámetro upstream al Facade para que filtre los turnos antes de responder, garantizando la cotización de tarifa exacta).
 
 3. **`party_size` (Cantidad de Jugadores):**
    * `'1'`, `'2'`, `'3'`, `'4'`.
@@ -106,12 +106,17 @@ El conector MCP inserta mediante `RPUSH` en la lista Redis `queue:avail:requests
 ### 2.2 Mapeo Facade &rarr; Upstream Country Golf
 El Facade adapta la solicitud a los campos exactos del API de Country Golf:
 
-| Campo API Country Golf | Origen en Payload MCP | Tipo | Ejemplo |
+| Campo API Country Golf / Filtro Facade | Origen en Payload MCP | Tipo | Ejemplo |
 | :--- | :--- | :--- | :--- |
 | **`start`** | `payload.date` | `string` (datetime ISO) | `"2026-03-26T00:00:00"` |
 | **`player_number`** | `payload.filters.party_size` | `integer` | `1` |
 | **`phone`** | `payload.user_phone` | `string` | `"+18095551234"` |
 | **`course`** | `payload.filters.course` | `string` | `"Campo Senior"` |
+| **`holes_preference`** | `payload.filters.holes_preference` | `string` (`"9"` o `"18"`) | `"18"` |
+
+> [!TIP]
+> **Filtrado previo en el Facade:**  
+> Como `holes_preference` viaja con `apply_mode: upstream_param`, el Facade debe utilizar este valor para filtrar los slots que devuelve hacia el conector MCP, garantizando que el motor de precios aplique la regla exacta de 9 o 18 hoyos según corresponda.
 
 #### Payload enviado por el Facade al API Upstream:
 ```json
