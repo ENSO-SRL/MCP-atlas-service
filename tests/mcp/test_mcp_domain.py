@@ -293,6 +293,55 @@ def test_establishment_rule_type_anticipation():
     assert est_tomorrow.is_date_allowed(today + timedelta(days=2), reference_date=today) is False
 
 
+def test_establishment_determine_availability_mode():
+    today = date(2026, 10, 22)
+    tomorrow = date(2026, 10, 23)
+    in_three_days = date(2026, 10, 25)
+    past = date(2026, 10, 21)
+
+    # 1. rule_type is None -> siempre real para fechas >= hoy
+    est_none = Establishment(id=1, name="Club Libre", code="CL", rule_type=None, has_scheduler=False)
+    assert est_none.determine_availability_mode(today, reference_date=today) == "real"
+    assert est_none.determine_availability_mode(in_three_days, reference_date=today) == "real"
+    assert est_none.determine_availability_mode(past, reference_date=today) == "past_date"
+
+    # 2. rule_type = TODAY_AND_TOMORROW
+    # Sin scheduler: solo hoy y mañana permitidos, días posteriores deshabilitados
+    est_tt_no_sched = Establishment(
+        id=2, name="Padel TT NoSched", code="PT1", rule_type=RuleType.TODAY_AND_TOMORROW, has_scheduler=False
+    )
+    assert est_tt_no_sched.determine_availability_mode(today, reference_date=today) == "real"
+    assert est_tt_no_sched.determine_availability_mode(tomorrow, reference_date=today) == "real"
+    assert est_tt_no_sched.determine_availability_mode(in_three_days, reference_date=today) == "disallowed"
+    assert est_tt_no_sched.determine_availability_mode(past, reference_date=today) == "past_date"
+
+    # Con scheduler: hoy y mañana son reales, días posteriores van por disponibilidad simbólica
+    est_tt_sched = Establishment(
+        id=3, name="Padel TT Sched", code="PT2", rule_type=RuleType.TODAY_AND_TOMORROW, has_scheduler=True
+    )
+    assert est_tt_sched.determine_availability_mode(today, reference_date=today) == "real"
+    assert est_tt_sched.determine_availability_mode(tomorrow, reference_date=today) == "real"
+    assert est_tt_sched.determine_availability_mode(in_three_days, reference_date=today) == "symbolic"
+    assert est_tt_sched.determine_availability_mode(past, reference_date=today) == "past_date"
+
+    # 3. rule_type = ONLY_TODAY
+    # Sin scheduler: solo hoy permitido
+    est_ot_no_sched = Establishment(
+        id=4, name="Golf OT NoSched", code="GT1", rule_type=RuleType.ONLY_TODAY, has_scheduler=False
+    )
+    assert est_ot_no_sched.determine_availability_mode(today, reference_date=today) == "real"
+    assert est_ot_no_sched.determine_availability_mode(tomorrow, reference_date=today) == "disallowed"
+    assert est_ot_no_sched.determine_availability_mode(in_three_days, reference_date=today) == "disallowed"
+
+    # Con scheduler: hoy es real, mañana en adelante es simbólico
+    est_ot_sched = Establishment(
+        id=5, name="Golf OT Sched", code="GT2", rule_type=RuleType.ONLY_TODAY, has_scheduler=True
+    )
+    assert est_ot_sched.determine_availability_mode(today, reference_date=today) == "real"
+    assert est_ot_sched.determine_availability_mode(tomorrow, reference_date=today) == "symbolic"
+    assert est_ot_sched.determine_availability_mode(in_three_days, reference_date=today) == "symbolic"
+
+
 def test_booking_request_on_demand_without_slot():
     """Prueba que un servicio de veterinaria/on-demand puede crear reservas sin slot_start, token ni hold."""
     user_uuid = uuid4()

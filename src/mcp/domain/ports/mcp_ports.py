@@ -130,8 +130,12 @@ class IRedisBusClient(ABC):
 
     @abstractmethod
     async def publish_availability_request(
-        self, operation_id: str, payload: dict[str, Any]
+        self,
+        operation_id: str,
+        payload: dict[str, Any],
+        queue_name: Optional[str] = None,
     ) -> None:
+        """Publica una solicitud de disponibilidad en la cola de trabajo (real o simbólica)."""
         pass
 
     @abstractmethod

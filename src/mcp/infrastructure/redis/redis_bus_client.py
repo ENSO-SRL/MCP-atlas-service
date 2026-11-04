@@ -25,10 +25,13 @@ class RedisBusClient(IRedisBusClient):
         self._settings = get_settings()
 
     async def publish_availability_request(
-        self, operation_id: str, payload: dict[str, Any]
+        self,
+        operation_id: str,
+        payload: dict[str, Any],
+        queue_name: Optional[str] = None,
     ) -> None:
         """
-        Publica una solicitud de disponibilidad en la cola 'queue:avail:requests'
+        Publica una solicitud de disponibilidad en la cola indicada (por defecto 'queue:avail:requests')
         e inicializa el registro op:{operation_id} con status='processing'.
         """
         envelope = {
@@ -46,7 +49,8 @@ class RedisBusClient(IRedisBusClient):
             },
             ttl_seconds=self._settings.REDIS_OPERATION_TTL,
         )
-        await self._redis.rpush("queue:avail:requests", json.dumps(envelope, ensure_ascii=False))
+        target_queue = queue_name or self._settings.REDIS_QUEUE_AVAIL_REQUESTS
+        await self._redis.rpush(target_queue, json.dumps(envelope, ensure_ascii=False))
 
     async def publish_dimension_request(
         self, operation_id: str, payload: dict[str, Any]

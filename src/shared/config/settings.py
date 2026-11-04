@@ -70,6 +70,14 @@ class Settings(BaseSettings):
         default=600,
         description="TTL en segundos para el estado y resultado de operaciones diferidas",
     )
+    REDIS_QUEUE_AVAIL_REQUESTS: str = Field(
+        default="queue:avail:requests",
+        description="Cola Redis para solicitudes de disponibilidad real contra el Facade",
+    )
+    REDIS_QUEUE_SYMBOLIC_AVAIL_REQUESTS: str = Field(
+        default="queue:avail:symbolic:requests",
+        description="Cola Redis para solicitudes de disponibilidad simbólica contra el Queuer/Reservas",
+    )
 
     # OAuth 2.0 y JWT
     OAUTH_ISSUER: str = Field(default="https://mcp.atlas.com")

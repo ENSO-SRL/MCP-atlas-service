@@ -29,6 +29,7 @@ from src.mcp.domain.ports.mcp_ports import (
 from src.mcp.domain.value_objects.canonical_filter_hash import CanonicalFilterHash
 from src.mcp.infrastructure.redis.redis_cache_manager import RedisAvailabilityCache
 from src.mcp.infrastructure.security.slot_token_codec import SlotTokenCodec
+from src.shared.config.settings import get_settings
 
 
 async def process_raw_slots(
@@ -222,13 +223,20 @@ class CheckAvailabilityUseCase:
                 ),
             )
 
-        # 3. Validación de antelación según políticas del establecimiento
+        # 3. Validación de antelación y determinación del modo de disponibilidad
         est = await self._establishment_repo.get_by_id(svc.establishment_id)
-        if est and not est.is_date_allowed(query.date):
-            rule_name = est.rule_type.value if est.rule_type else "política de antelación"
+        avail_mode = "real"
+        if est:
+            avail_mode = est.determine_availability_mode(query.date)
+
+        if avail_mode == "past_date":
+            raise BookingRuleViolationException("No es posible consultar disponibilidad para fechas pasadas.")
+
+        if avail_mode == "disallowed":
+            rule_name = est.rule_type.value if est and est.rule_type else "política de antelación"
             raise BookingRuleViolationException(
                 f"La fecha consultada ({query.date}) no está permitida por el establecimiento "
-                f"según su regla operativa ({rule_name})."
+                f"según su regla operativa ({rule_name}) y no cuenta con servicio de agendamiento previo habilitado."
             )
 
         # 4. Cálculo de hash determinista canónico
@@ -250,7 +258,13 @@ class CheckAvailabilityUseCase:
         if cached_data is not None:
             raw_slots = cached_data.get("slots", [])
         else:
-            # 6. Cache MISS: Publicar petición en bus RPC sobre Redis
+            # 6. Cache MISS: Publicar petición en bus RPC sobre Redis (cola real o simbólica)
+            settings = get_settings()
+            target_queue = (
+                settings.REDIS_QUEUE_SYMBOLIC_AVAIL_REQUESTS
+                if avail_mode == "symbolic"
+                else settings.REDIS_QUEUE_AVAIL_REQUESTS
+            )
             operation_id = f"op_avail_{uuid4().hex[:12]}"
             bus_payload = {
                 "service_id": query.service_id,
@@ -262,7 +276,9 @@ class CheckAvailabilityUseCase:
                 "contract_version": contract_version_label,
                 "filter_hash": filter_hash,
             }
-            await self._bus_client.publish_availability_request(operation_id, bus_payload)
+            await self._bus_client.publish_availability_request(
+                operation_id, bus_payload, queue_name=target_queue
+            )
 
             # Espera superficial no bloqueante (2 segundos)
             response_key = f"resp:{operation_id}"
@@ -299,8 +315,13 @@ class CheckAvailabilityUseCase:
                     applied_filters=query.filters,
                     filter_hash=filter_hash,
                     message=(
-                        "La consulta de disponibilidad está tardando más de lo habitual y continúa procesándose en segundo plano. "
+                        "La consulta de disponibilidad estimada está tardando más de lo habitual y continúa procesándose en segundo plano. "
                         "Usa la herramienta 'get_operation_result' con el operation_id para consultar el resultado."
+                        if avail_mode == "symbolic"
+                        else (
+                            "La consulta de disponibilidad está tardando más de lo habitual y continúa procesándose en segundo plano. "
+                            "Usa la herramienta 'get_operation_result' con el operation_id para consultar el resultado."
+                        )
                     ),
                 )
 

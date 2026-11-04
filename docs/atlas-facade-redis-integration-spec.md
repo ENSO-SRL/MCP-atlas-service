@@ -23,6 +23,7 @@ flowchart TD
 
     subgraph Redis ["Redis Bus & Cache"]
         Q_Avail["queue:avail:requests (List)"]
+        Q_Sym_Avail["queue:avail:symbolic:requests (List)"]
         Q_Dim["queue:dim:requests (List)"]
         Resp_Op["resp:{operation_id} (List BLPOP)"]
         Op_State["op:{operation_id} (String/JSON)"]
@@ -33,22 +34,28 @@ flowchart TD
         Stream_Results["stream:booking:results (Stream)"]
     end
 
-    subgraph Facade ["Servicio Facade / Ejecutor"]
-        Avail_Worker["Worker de Disponibilidad"]
+    subgraph Facade ["Servicios Backend / Facade & Queuer"]
+        Avail_Worker["Worker de Disponibilidad Real (Facade)"]
+        Queuer_Worker["Worker de Disponibilidad Simbólica (Queuer/Reservas)"]
         Dim_Worker["Worker de Dimensiones"]
         Queuer_Engine["Motor Queuer"]
         Exec_Worker["Ejecutor de Reservas Físicas"]
     end
 
     %% RPC Disponibilidad
-    MCP -->|"RPUSH consulta"| Q_Avail
-    MCP -->|"RPUSH consulta"| Q_Dim
+    MCP -->|"RPUSH consulta real"| Q_Avail
+    MCP -->|"RPUSH consulta simbólica"| Q_Sym_Avail
+    MCP -->|"RPUSH consulta dimensión"| Q_Dim
     Avail_Worker -->|"BLPOP / BRPOP"| Q_Avail
+    Queuer_Worker -->|"BLPOP / BRPOP"| Q_Sym_Avail
     Dim_Worker -->|"BLPOP / BRPOP"| Q_Dim
     Avail_Worker -->|"RPUSH respuesta rápida"| Resp_Op
+    Queuer_Worker -->|"RPUSH respuesta rápida"| Resp_Op
     Dim_Worker -->|"RPUSH respuesta rápida"| Resp_Op
     Avail_Worker -->|"SET resultado diferido"| Op_State
+    Queuer_Worker -->|"SET resultado diferido"| Op_State
     Avail_Worker -->|"SET Cache-Aside"| Cache_Avail
+    Queuer_Worker -->|"SET Cache-Aside"| Cache_Avail
     Dim_Worker -->|"SET Cache-Aside"| Cache_Dim
 
     %% Holds
@@ -193,15 +200,88 @@ Si el proveedor externo falla, da timeout o no se puede procesar la consulta:
 {
   "operation_id": "op-550e8400-e29b-41d4-a716-446655440000",
   "status": "failed",
-  "error": "Error de conexión con la pasarela del club de pádel. Intente más tarde."
+  "result_type": "internal_error", // o "error_to_user"
+  "detail": "Error de conexión con la pasarela del club de pádel.",
+  "error": "Error de conexión con la pasarela del club de pádel."
 }
 ```
-*Si fue diferido (>2s)*, escribir esto en `op:{operation_id}` con `SET op:{operation_id} '<json>' EX 600`.  
-*Si fue rápido (≤2s)*, empujar a `resp:{operation_id}` con `RPUSH` + `EXPIRE 60`.
+* **`result_type: "internal_error"`**: El Conector MCP registrará el `detail` en sus logs internos y devolverá al usuario un mensaje genérico seguro: *"El servicio que está solicitando actualmente se encuentra inaccesible debido a dificultades técnicas."*
+* **`result_type: "error_to_user"`**: El Conector MCP entregará directamente el texto del campo `detail` al usuario (ej. *"El socio no posee membresía activa para la fecha solicitada"*).
+* *Si fue diferido (>2s)*, escribir esto en `op:{operation_id}` con `SET op:{operation_id} '<json>' EX 600`.  
+* *Si fue rápido (≤2s)*, empujar a `resp:{operation_id}` con `RPUSH` + `EXPIRE 60`.
 
 ---
 
-### 2.2 Consulta de Opciones de Dimensión (`get_dimension_options`)
+### 2.2 Consulta de Disponibilidad Simbólica (`check_availability` para Queuer)
+
+Para establecimientos físicos con esquemas estrictos de publicación (`rule_type`: `ONLY_TODAY` o `TODAY_AND_TOMORROW`) y con agendamiento previo habilitado (`has_scheduler: true`), el MCP no consulta al Facade externo para fechas que aún no han sido publicadas por el club. En su lugar, el MCP consulta al **Servicio Interno de Reservas / Queuer** para generar slots estereotípicos estimados.
+
+#### A. Recepción de Solicitud
+* **Canal:** `queue:avail:symbolic:requests`
+* **Tipo de estructura Redis:** Redis List
+* **Mecanismo:** MCP envía mediante `RPUSH`. El Servicio de Reservas/Queuer debe escuchar mediante `BLPOP` o `BRPOP`.
+* **Clave de estado inicial creada por MCP:** Idéntica a la disponibilidad real (`op:{operation_id}` con TTL de 600 segundos y `status="processing"`).
+
+#### B. Estructura del Mensaje Recibido en `queue:avail:symbolic:requests`
+El mensaje recibido tiene **exactamente la misma estructura** que en la disponibilidad real:
+```json
+{
+  "operation_id": "op-550e8400-e29b-41d4-a716-446655440000",
+  "type": "availability_request",
+  "payload": {
+    "service_id": 20,
+    "combo_code": "PADEL_INDOOR",
+    "user_uuid": "c4d7e231-1829-4d6b-9c71-332998822001",
+    "user_phone": "+18095551234",
+    "user_email": "carlos.gomez@example.com",
+    "date": "2026-11-15",
+    "filters": {
+      "course": "Campo Senior",
+      "party_size": 2
+    },
+    "contract_version": "v1.0",
+    "filter_hash": "6b3f7e8a9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f"
+  },
+  "created_at": "2026-10-27T15:00:00Z"
+}
+```
+
+#### C. Qué debe devolver el Servicio de Reservas / Queuer
+El servicio consulta su plantilla estereotípica de slots configurados para ese servicio/establecimiento, descuenta aquellos slots que ya tengan reservas agendadas en cola para esa fecha y hora, y retorna la lista de slots con `is_estimated: true` y `slot_type: "estimated"`:
+
+```json
+{
+  "operation_id": "op-550e8400-e29b-41d4-a716-446655440000",
+  "status": "completed",
+  "result_type": "availability",
+  "service_id": 20,
+  "contract_version": "v1.0",
+  "filter_hash": "6b3f7e8a9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f",
+  "as_of": "2026-10-27T15:00:01.500000Z",
+  "slots": [
+    {
+      "offer_ref": "queuer-slot-20261115-0800",
+      "slot_start": "2026-11-15T08:00:00Z",
+      "slot_end": "2026-11-15T12:00:00Z",
+      "resource_ref": null,
+      "resource_name": "Horario Estimado Queuer",
+      "is_estimated": true,
+      "slot_type": "estimated",
+      "notice": "Horario estimado del Queuer. La sede publica los turnos oficiales el día anterior.",
+      "attributes": {
+        "course": "Campo Senior",
+        "holes": 18
+      }
+    }
+  ]
+}
+```
+* **Respuesta Rápida (≤ 2.0s):** `RPUSH resp:{operation_id} '<json>'` + `EXPIRE resp:{operation_id} 60`.
+* **Respuesta Diferida (> 2.0s):** `SET op:{operation_id} '<json>' EX 600` + `RPUSH resp:{operation_id} '<json>'`.
+
+---
+
+### 2.3 Consulta de Opciones de Dimensión (`get_dimension_options`)
 
 Aplica para dimensiones cuyo contrato declara `values_source = "separate_query"` (por ejemplo: lista de mecánicos disponibles en un taller para una fecha dada, o lista de pistas activas).
 

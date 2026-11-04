@@ -520,6 +520,172 @@ async def test_check_availability_immediate_failed_error_to_user(
 
 
 @pytest.mark.asyncio
+async def test_check_availability_symbolic_routed_to_symbolic_queue(
+    sample_service, sample_establishment, sample_contract, sample_price_rule, mock_token_codec
+):
+    """
+    Prueba que para un establecimiento con TODAY_AND_TOMORROW y has_scheduler=True,
+    una fecha posterior a mañana se enruta a 'queue:avail:symbolic:requests' (Queuer),
+    y los slots retornados son tipificados como 'estimated'.
+    """
+    sample_establishment.rule_type = RuleType.TODAY_AND_TOMORROW
+    sample_establishment.has_scheduler = True
+
+    today = date.today()
+    future_date = today + timedelta(days=5)
+    slot_dt = datetime(future_date.year, future_date.month, future_date.day, 10, 0, tzinfo=timezone.utc)
+
+    mock_catalog = MagicMock()
+    mock_catalog.get_by_id = AsyncMock(return_value=sample_service)
+    mock_contract = MagicMock()
+    mock_contract.get_active_by_service_id = AsyncMock(return_value=sample_contract)
+    mock_contract.list_price_rules_for_service = AsyncMock(return_value=[sample_price_rule])
+    mock_est = MagicMock()
+    mock_est.get_by_id = AsyncMock(return_value=sample_establishment)
+
+    mock_cache = MagicMock()
+    mock_cache.get = AsyncMock(return_value=None)
+    mock_cache.set = AsyncMock()
+    mock_hold = MagicMock()
+    mock_hold.is_held = AsyncMock(return_value=False)
+
+    mock_bus = MagicMock()
+    mock_bus.publish_availability_request = AsyncMock()
+    mock_bus.wait_for_response = AsyncMock(
+        return_value={
+            "slots": [
+                {
+                    "offer_ref": "queuer_slot_10am",
+                    "slot_start": slot_dt.isoformat(),
+                    "slot_end": (slot_dt + timedelta(hours=1)).isoformat(),
+                    "resource_ref": None,
+                    "resource_name": "Horario Estimado Queuer",
+                    "is_estimated": True,
+                    "slot_type": "estimated",
+                    "notice": "Horario estimado del Queuer.",
+                    "attributes": {"surface": "cristal"},
+                }
+            ]
+        }
+    )
+
+    use_case = CheckAvailabilityUseCase(
+        establishment_repo=mock_est,
+        catalog_service_repo=mock_catalog,
+        contract_repo=mock_contract,
+        avail_cache=mock_cache,
+        hold_manager=mock_hold,
+        bus_client=mock_bus,
+        token_codec=mock_token_codec,
+    )
+
+    user_uuid = uuid4()
+    res = await use_case.execute(
+        CheckAvailabilityQueryDTO(
+            service_id=20,
+            date=future_date,
+            user_uuid=user_uuid,
+        )
+    )
+
+    assert res.status == "completed"
+    assert len(res.slots) == 1
+    slot = res.slots[0]
+    assert slot.offer_ref == "queuer_slot_10am"
+    assert slot.is_estimated is True
+    assert slot.slot_type == "estimated"
+    assert slot.notice is not None
+
+    # Verificar que se publicó a la cola de disponibilidad simbólica
+    mock_bus.publish_availability_request.assert_called_once()
+    assert mock_bus.publish_availability_request.call_args.kwargs["queue_name"] == "queue:avail:symbolic:requests"
+
+    # Verificar que el token decodificado contiene is_estimated=True
+    decoded = mock_token_codec.decode(slot.slot_token)
+    assert decoded.is_estimated is True
+
+
+@pytest.mark.asyncio
+async def test_check_availability_past_date_raises_exception(
+    sample_service, sample_establishment, sample_contract, mock_token_codec
+):
+    """Prueba que una consulta para una fecha pasada lanza BookingRuleViolationException."""
+    today = date.today()
+    past_date = today - timedelta(days=1)
+
+    mock_catalog = MagicMock()
+    mock_catalog.get_by_id = AsyncMock(return_value=sample_service)
+    mock_contract = MagicMock()
+    mock_contract.get_active_by_service_id = AsyncMock(return_value=sample_contract)
+    mock_est = MagicMock()
+    mock_est.get_by_id = AsyncMock(return_value=sample_establishment)
+
+    use_case = CheckAvailabilityUseCase(
+        establishment_repo=mock_est,
+        catalog_service_repo=mock_catalog,
+        contract_repo=mock_contract,
+        avail_cache=MagicMock(),
+        hold_manager=MagicMock(),
+        bus_client=MagicMock(),
+        token_codec=mock_token_codec,
+    )
+
+    with pytest.raises(BookingRuleViolationException) as exc_info:
+        await use_case.execute(
+            CheckAvailabilityQueryDTO(
+                service_id=20,
+                date=past_date,
+                user_uuid=uuid4(),
+            )
+        )
+
+    assert "fechas pasadas" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
+async def test_check_availability_disallowed_without_scheduler_raises_exception(
+    sample_service, sample_establishment, sample_contract, mock_token_codec
+):
+    """
+    Prueba que para un establecimiento con regla estricta (TODAY_AND_TOMORROW)
+    pero SIN scheduler (has_scheduler=False), fechas posteriores lanzan BookingRuleViolationException.
+    """
+    sample_establishment.rule_type = RuleType.TODAY_AND_TOMORROW
+    sample_establishment.has_scheduler = False
+
+    today = date.today()
+    in_three_days = today + timedelta(days=3)
+
+    mock_catalog = MagicMock()
+    mock_catalog.get_by_id = AsyncMock(return_value=sample_service)
+    mock_contract = MagicMock()
+    mock_contract.get_active_by_service_id = AsyncMock(return_value=sample_contract)
+    mock_est = MagicMock()
+    mock_est.get_by_id = AsyncMock(return_value=sample_establishment)
+
+    use_case = CheckAvailabilityUseCase(
+        establishment_repo=mock_est,
+        catalog_service_repo=mock_catalog,
+        contract_repo=mock_contract,
+        avail_cache=MagicMock(),
+        hold_manager=MagicMock(),
+        bus_client=MagicMock(),
+        token_codec=mock_token_codec,
+    )
+
+    with pytest.raises(BookingRuleViolationException) as exc_info:
+        await use_case.execute(
+            CheckAvailabilityQueryDTO(
+                service_id=20,
+                date=in_three_days,
+                user_uuid=uuid4(),
+            )
+        )
+
+    assert "no cuenta con servicio de agendamiento previo" in str(exc_info.value)
+
+
+@pytest.mark.asyncio
 async def test_get_operation_result_not_found(mock_token_codec):
     mock_bus = MagicMock()
     mock_bus.get_operation_result = AsyncMock(return_value=None)

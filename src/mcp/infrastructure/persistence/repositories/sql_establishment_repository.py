@@ -61,6 +61,7 @@ class SqlEstablishmentRepository(IEstablishmentRepository):
             description=model.description,
             is_active=model.is_active,
             has_credentials=model.has_credentials,
+            has_scheduler=bool(model.has_scheduler) if model.has_scheduler is not None else False,
             rule_type=rule_type,
             opening_hour=model.opening_hour,
             closing_hour=model.closing_hour,
