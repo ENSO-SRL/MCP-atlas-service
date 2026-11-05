@@ -48,6 +48,7 @@ class SlotTokenCodec:
         expires_at: datetime,
         applied_filters: Optional[dict[str, Any]] = None,
         is_estimated: bool = False,
+        projected_total: Optional[float] = None,
     ) -> SlotToken:
         """
         Genera y cifra el token de oferta produciendo un SlotToken válido con raw_token.
@@ -63,6 +64,7 @@ class SlotTokenCodec:
             "expires_at": expires_at.isoformat(),
             "applied_filters": applied_filters or {},
             "is_estimated": is_estimated,
+            "projected_total": float(projected_total) if projected_total is not None else None,
         }
         serialized = json.dumps(payload, separators=(",", ":"), ensure_ascii=True)
         raw_token = self._fernet.encrypt(serialized.encode("utf-8")).decode("utf-8")
@@ -79,6 +81,7 @@ class SlotTokenCodec:
             raw_token=raw_token,
             applied_filters=applied_filters or {},
             is_estimated=is_estimated,
+            projected_total=float(projected_total) if projected_total is not None else None,
         )
 
     def decode(self, raw_token: str, now: Optional[datetime] = None) -> SlotToken:
@@ -112,6 +115,8 @@ class SlotTokenCodec:
             expires_at = datetime.fromisoformat(payload["expires_at"])
             applied_filters = payload.get("applied_filters", {})
             is_estimated = bool(payload.get("is_estimated", False))
+            raw_projected_total = payload.get("projected_total")
+            projected_total = float(raw_projected_total) if raw_projected_total is not None else None
         except (KeyError, ValueError, TypeError) as e:
             raise SlotTokenInvalidException(f"Estructura interna de token corrupta: {str(e)}")
 
@@ -133,6 +138,7 @@ class SlotTokenCodec:
             raw_token=raw_token,
             applied_filters=applied_filters,
             is_estimated=is_estimated,
+            projected_total=projected_total,
         )
 
     def verify_for_user(self, token: SlotToken, expected_user_uuid: UUID) -> None:

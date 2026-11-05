@@ -85,6 +85,7 @@ def register_availability_tools(server: MCPServer) -> None:
                     }
                     if s.price_estimate
                     else None,
+                    "projected_total": s.projected_total,
                     "attributes": s.attributes,
                     "applied_filters": s.applied_filters,
                 }
@@ -157,6 +158,7 @@ def register_availability_tools(server: MCPServer) -> None:
                     }
                     if s.price_estimate
                     else None,
+                    "projected_total": s.projected_total,
                     "attributes": s.attributes,
                     "applied_filters": s.applied_filters,
                 }

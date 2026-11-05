@@ -64,6 +64,7 @@ def register_booking_tools(server: MCPServer) -> None:
             "slot_start": res.slot_start.isoformat() if res.slot_start else None,
             "slot_end": res.slot_end.isoformat() if res.slot_end else None,
             "is_estimated": res.is_estimated,
+            "projected_total": res.projected_total,
             "applied_filters": res.applied_filters,
             "status_reason": res.status_reason,
             "external_ref": res.external_ref,

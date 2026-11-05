@@ -112,9 +112,16 @@ async def process_raw_slots(
                     slot_party_size = int(slot_applied_filters["players"])
                 except (ValueError, TypeError):
                     slot_party_size = None
+            elif "game_type" in slot_applied_filters:
+                gt = str(slot_applied_filters["game_type"]).lower()
+                if gt in ("sencillo", "singles", "single"):
+                    slot_party_size = 2
+                elif gt in ("dobles", "doubles", "double"):
+                    slot_party_size = 4
 
         # 3. Estimación de precio evaluada sobre el contexto consolidado del slot
         price_dto: Optional[SlotPriceEstimateDTO] = None
+        projected_total: Optional[float] = None
         for rule in sorted(price_rules, key=lambda r: r.priority, reverse=True):
             if rule.is_applicable(slot_start, party_size=slot_party_size, applied_filters=slot_applied_filters):
                 estimate = rule.calculate_estimate(party_size=slot_party_size)
@@ -129,6 +136,9 @@ async def process_raw_slots(
                     rule_label=rule.label,
                     formatted=estimate.formatted,
                 )
+                tot = estimate.total_amount if estimate.total_amount is not None else estimate.amount
+                if tot is not None:
+                    projected_total = float(tot)
                 break
 
         # 4. Acuñación del SlotToken criptográfico con applied_filters enriquecidos
@@ -146,6 +156,7 @@ async def process_raw_slots(
             expires_at=expires_at,
             applied_filters=slot_applied_filters,
             is_estimated=is_estimated,
+            projected_total=projected_total,
         )
 
         available_slots.append(
@@ -160,6 +171,7 @@ async def process_raw_slots(
                 slot_type=slot_type,
                 notice=notice,
                 price_estimate=price_dto,
+                projected_total=projected_total,
                 attributes=raw_attributes,
                 applied_filters=slot_applied_filters,
             )

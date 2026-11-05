@@ -46,6 +46,7 @@ class AvailableSlotDTO:
     slot_type: str = "official"  # "official" | "estimated"
     notice: Optional[str] = None
     price_estimate: Optional[SlotPriceEstimateDTO] = None
+    projected_total: Optional[float] = None
     attributes: dict[str, Any] = field(default_factory=dict)
     applied_filters: dict[str, Any] = field(default_factory=dict)
 

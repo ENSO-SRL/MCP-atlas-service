@@ -153,6 +153,7 @@ class CreateBookingRequestUseCase:
         token_id: Optional[str] = None
         applied_filters: dict[str, Any] = {}
         is_estimated: bool = False
+        projected_total: Optional[float] = None
 
         if slot_token_obj is not None:
             token_id = slot_token_obj.token_id
@@ -161,6 +162,7 @@ class CreateBookingRequestUseCase:
             slot_end = slot_token_obj.slot_end
             applied_filters = slot_token_obj.applied_filters
             is_estimated = slot_token_obj.is_estimated
+            projected_total = slot_token_obj.projected_total
 
             if not is_estimated:
                 # Slot real: adquirir hold atómico con TTL de seguridad (request_ttl_seconds)
@@ -216,6 +218,7 @@ class CreateBookingRequestUseCase:
             "slot_start": booking.slot_start.isoformat() if booking.slot_start else None,
             "slot_end": booking.slot_end.isoformat() if booking.slot_end else None,
             "is_estimated": is_estimated,
+            "projected_total": projected_total,
             "applied_filters": booking.applied_filters,
             "fields": booking.fields,
             "expires_at": booking.expires_at.isoformat(),
@@ -236,6 +239,7 @@ class CreateBookingRequestUseCase:
             slot_start=slot_start,
             slot_end=slot_end,
             is_estimated=is_estimated,
+            projected_total=projected_total,
             applied_filters=applied_filters,
             expires_at=booking.expires_at,
             message=(

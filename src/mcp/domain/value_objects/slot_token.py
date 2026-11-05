@@ -26,6 +26,7 @@ class SlotToken(ValueObject):
     raw_token: str
     applied_filters: dict[str, Any] = field(default_factory=dict)
     is_estimated: bool = False
+    projected_total: Optional[float] = None
 
     def is_expired(self, now: Optional[datetime] = None) -> bool:
         current_time = now or datetime.now(timezone.utc)

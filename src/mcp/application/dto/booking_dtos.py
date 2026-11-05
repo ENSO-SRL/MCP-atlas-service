@@ -27,6 +27,7 @@ class BookingCreationResultDTO:
     slot_start: Optional[datetime] = None
     slot_end: Optional[datetime] = None
     is_estimated: bool = False
+    projected_total: Optional[float] = None
     applied_filters: dict[str, Any] = field(default_factory=dict)
     status_reason: Optional[str] = None
     external_ref: Optional[str] = None

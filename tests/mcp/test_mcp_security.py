@@ -30,6 +30,7 @@ def test_slot_token_encode_decode_happy_path():
         expires_at=expires_at,
         applied_filters={"surface": "clay", "covered": True},
         is_estimated=True,
+        projected_total=300.0,
     )
 
     assert token.token_id == "tok_abc123"
@@ -39,6 +40,7 @@ def test_slot_token_encode_decode_happy_path():
     assert token.contract_version == "2026-10-26.1"
     assert token.applied_filters == {"surface": "clay", "covered": True}
     assert token.is_estimated is True
+    assert token.projected_total == 300.0
     assert token.raw_token is not None
 
     # Decodificar el raw_token generado
@@ -49,6 +51,7 @@ def test_slot_token_encode_decode_happy_path():
     assert decoded.service_id == 10
     assert decoded.applied_filters == {"surface": "clay", "covered": True}
     assert decoded.is_estimated is True
+    assert decoded.projected_total == 300.0
     assert decoded.contract_version == "2026-10-26.1"
     assert decoded.raw_token == token.raw_token
 

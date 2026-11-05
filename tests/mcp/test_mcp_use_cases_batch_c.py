@@ -106,6 +106,7 @@ def sample_slot_token_str(mock_token_codec, sample_user_uuid):
         expires_at=datetime.now(timezone.utc) + timedelta(minutes=15),
         applied_filters={"court_surface": "cristal", "indoor": True},
         is_estimated=False,
+        projected_total=450.0,
     )
     return token.raw_token
 
@@ -183,6 +184,7 @@ async def test_create_booking_happy_path_slot_based(
     assert result.service_id == 20
     assert result.applied_filters == {"court_surface": "cristal", "indoor": True}
     assert result.is_estimated is False
+    assert result.projected_total == 450.0
     assert "segundo plano" in result.message
 
     # Verificar hold colocado con TTL del contrato (900s)
@@ -200,6 +202,7 @@ async def test_create_booking_happy_path_slot_based(
     assert event_args["payload"]["token_id"] == "tok-test-123"
     assert event_args["payload"]["combo_code"] == "PADEL_ORO"
     assert event_args["payload"]["user_phone"] == "+18095551234"
+    assert event_args["payload"]["projected_total"] == 450.0
     assert event_args["payload"]["applied_filters"] == {"court_surface": "cristal", "indoor": True}
 
 
@@ -773,3 +776,68 @@ async def test_cancel_booking_invalid_transition_when_already_cancelled(sample_u
 
     with pytest.raises(InvalidStateTransitionException):
         await use_case.execute(query)
+
+
+@pytest.mark.asyncio
+async def test_create_booking_propagates_projected_total_from_slot_token(
+    mock_token_codec, sample_user_uuid, sample_contract
+):
+    """Verifica que el projected_total cifrado en el slot_token se propague al outbox_payload y al DTO resultante."""
+    token = mock_token_codec.encode(
+        token_id="tok-projected-999",
+        user_uuid=sample_user_uuid,
+        offer_ref="off-tennis-doubles",
+        service_id=20,
+        slot_start=datetime(2026, 11, 10, 16, 0, tzinfo=timezone.utc),
+        slot_end=datetime(2026, 11, 10, 17, 30, tzinfo=timezone.utc),
+        contract_version="1",
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=15),
+        applied_filters={"game_type": "dobles"},
+        projected_total=600.0,
+    )
+
+    mock_booking_repo = MagicMock()
+    mock_booking_repo.get_by_idempotency_key = AsyncMock(return_value=None)
+    mock_booking_repo.save = AsyncMock(side_effect=lambda b: b)
+
+    mock_contract_repo = MagicMock()
+    mock_contract_repo.get_active_by_service_id = AsyncMock(return_value=sample_contract)
+
+    mock_hold_manager = MagicMock()
+    mock_hold_manager.place_hold = AsyncMock(return_value=True)
+
+    mock_outbox_repo = MagicMock()
+    mock_outbox_repo.record_event = AsyncMock()
+
+    mock_catalog_repo = MagicMock()
+    mock_catalog_repo.get_by_id = AsyncMock(
+        return_value=CatalogService(id=20, establishment_id=1, name="Tenis Dobles", combo_code="TENNIS_DOUBLES")
+    )
+
+    use_case = CreateBookingRequestUseCase(
+        booking_repo=mock_booking_repo,
+        contract_repo=mock_contract_repo,
+        outbox_repo=mock_outbox_repo,
+        token_codec=mock_token_codec,
+        hold_manager=mock_hold_manager,
+        catalog_repo=mock_catalog_repo,
+    )
+
+    input_dto = CreateBookingInputDTO(
+        user_uuid=sample_user_uuid,
+        idempotency_key="idemp-projected-total-test",
+        slot_token=token.raw_token,
+        fields={"player_count": 4},
+        user_phone="+18095559999",
+    )
+
+    res = await use_case.execute(input_dto)
+
+    assert res.status == "requested"
+    assert res.projected_total == 600.0
+
+    mock_outbox_repo.record_event.assert_awaited_once()
+    payload = mock_outbox_repo.record_event.call_args[1]["payload"]
+    assert payload["projected_total"] == 600.0
+    assert payload["token_id"] == "tok-projected-999"
+
