@@ -43,7 +43,9 @@ class ICatalogServiceRepository(ABC):
         pass
 
     @abstractmethod
-    async def list_by_establishment(self, establishment_id: int) -> list[CatalogService]:
+    async def list_by_establishment(
+        self, establishment_id: int, limit: Optional[int] = None
+    ) -> list[CatalogService]:
         pass
 
 

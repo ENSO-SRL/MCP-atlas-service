@@ -93,3 +93,5 @@ class CatalogService(Entity[int]):
     combo_code: Optional[str] = None
     sub_endpoint: Optional[str] = None
     configuration: dict = field(default_factory=dict)
+    location: LocationAddress = field(default_factory=LocationAddress)
+    contact: ContactInfo = field(default_factory=ContactInfo)

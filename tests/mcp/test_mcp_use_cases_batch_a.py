@@ -458,3 +458,199 @@ async def test_get_dimension_options_cache_miss_timeout_processing():
     assert res.operation_id.startswith("op_dim_")
     assert len(res.options) == 0
     mock_dim_cache.set.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_search_businesses_with_gateway_establishment_completes_limit_from_query():
+    """
+    Verifica que si un establecimiento pertenece a la categoría 'Pasarelas', no se incluya
+    en los resultados y en su lugar se consulte la BD aplicando el limit restante para traer
+    sus servicios activos marcados con is_service=True.
+    """
+    mock_est_repo = MagicMock()
+    mock_est_repo.search = AsyncMock(
+        return_value=[
+            Establishment(
+                id=1,
+                name="Club Tenis Santo Domingo",
+                code="CTSD",
+                category_name="Tenis",
+                location=LocationAddress(city="Santo Domingo", sector="Piantini"),
+                opening_hour=time(7, 0),
+                closing_hour=time(22, 0),
+                rule_type=RuleType.ONLY_TODAY,
+            ),
+            Establishment(
+                id=99,
+                name="Pasarela General de Reservas",
+                code="PASARELA_RES",
+                category_name="Pasarelas",
+                location=LocationAddress(city="Santo Domingo", sector="Naco"),
+                opening_hour=time(8, 0),
+                closing_hour=time(20, 0),
+                rule_type=RuleType.TODAY_AND_TOMORROW,
+            ),
+        ]
+    )
+
+    mock_svc_repo = MagicMock()
+    mock_svc_repo.list_by_establishment = AsyncMock(
+        return_value=[
+            CatalogService(
+                id=501,
+                establishment_id=99,
+                name="Club Pádel Bella Vista",
+                category_name="Pádel",
+                combo_code="PADEL_BV",
+                location=LocationAddress(city="Santo Domingo", sector="Bella Vista", street="Av. Sarasota", building_number="12"),
+                contact=ContactInfo(phone="+18095558888"),
+            ),
+            CatalogService(
+                id=502,
+                establishment_id=99,
+                name="Pádel City Los Prados",
+                category_name="Pádel",
+                combo_code="PADEL_LP",
+                location=LocationAddress(city="Santo Domingo", sector="Los Prados"),
+                contact=ContactInfo(phone="+18095559999"),
+            ),
+        ]
+    )
+
+    use_case = SearchBusinessesUseCase(
+        establishment_repo=mock_est_repo,
+        catalog_service_repo=mock_svc_repo,
+    )
+
+    # Buscamos con limit=3
+    result = await use_case.execute(
+        SearchBusinessesQueryDTO(query="pádel", limit=3, cursor=0)
+    )
+
+    # Verificamos que se llamó list_by_establishment con limit restante = 3 - 1 = 2 directamente en la BD
+    mock_svc_repo.list_by_establishment.assert_awaited_once_with(
+        establishment_id=99,
+        limit=2,
+    )
+
+    # La lista debe tener 3 items en total
+    assert len(result.items) == 3
+
+    # El primero es el establecimiento tradicional
+    assert result.items[0].id == 1
+    assert result.items[0].name == "Club Tenis Santo Domingo"
+    assert result.items[0].is_service is False
+
+    # La pasarela (id=99) fue excluida y reemplazada por sus servicios
+    assert not any(item.id == 99 for item in result.items)
+
+    # Los siguientes dos son los servicios de la pasarela marcados con is_service=True
+    assert result.items[1].id == 501
+    assert result.items[1].name == "Club Pádel Bella Vista"
+    assert result.items[1].sector == "Bella Vista"
+    assert result.items[1].rule_type == "today_and_tomorrow"  # Heredado de la pasarela
+    assert result.items[1].is_service is True
+
+    assert result.items[2].id == 502
+    assert result.items[2].name == "Pádel City Los Prados"
+    assert result.items[2].is_service is True
+
+
+@pytest.mark.asyncio
+async def test_get_business_details_as_physical_service():
+    """
+    Verifica que get_business_details con is_service=True recupere contacto y ubicación
+    del servicio físico y las reglas técnicas operativas de la pasarela padre.
+    """
+    mock_svc_repo = MagicMock()
+    mock_svc_repo.get_by_id = AsyncMock(
+        return_value=CatalogService(
+            id=77,
+            establishment_id=99,
+            name="Cancha Central Pádel Las Colinas",
+            category_name="Pádel",
+            combo_code="COLINAS_PADEL",
+            location=LocationAddress(
+                city="Santiago",
+                sector="Cerros de Gurabo",
+                street="Calle Principal",
+                building_number="5",
+                postal_code="51000",
+            ),
+            contact=ContactInfo(
+                phone="+18095557777",
+                email="reservas@colinaspadel.do",
+                website="https://colinaspadel.do",
+            ),
+        )
+    )
+
+    mock_est_repo = MagicMock()
+    mock_est_repo.get_by_id = AsyncMock(
+        return_value=Establishment(
+            id=99,
+            name="Pasarela Deportiva Nacional",
+            code="PASARELA_NACIONAL",
+            category_name="Pasarelas",
+            opening_hour=time(6, 30),
+            closing_hour=time(23, 0),
+            rule_type=RuleType.TODAY_AND_TOMORROW,
+        )
+    )
+
+    mock_contract_repo = MagicMock()
+    mock_contract_repo.get_active_by_service_id = AsyncMock(
+        return_value=ServiceContractVersion(
+            id=uuid4(),
+            service_id=77,
+            pattern=AvailabilityPattern.SLOT_OBJECT,
+            status=ContractStatus.PUBLISHED,
+        )
+    )
+
+    use_case = GetBusinessDetailsUseCase(
+        establishment_repo=mock_est_repo,
+        catalog_service_repo=mock_svc_repo,
+        contract_repo=mock_contract_repo,
+    )
+
+    res = await use_case.execute(BusinessDetailsQueryDTO(business_id=77, is_service=True))
+
+    # Verifica datos del servicio físico
+    assert res.id == 77
+    assert res.name == "Cancha Central Pádel Las Colinas"
+    assert res.city == "Santiago"
+    assert res.sector == "Cerros de Gurabo"
+    assert res.address_line == "Calle Principal 5"
+    assert res.phone == "+18095557777"
+    assert res.email == "reservas@colinaspadel.do"
+    assert res.is_service is True
+
+    # Verifica reglas técnicas heredadas de la pasarela padre
+    assert res.operating_hours == {"opening": "06:30", "closing": "23:00"}
+    assert res.rule_type == "today_and_tomorrow"
+    assert "únicamente para hoy y mañana" in res.advance_booking_rule
+
+    # Verifica que el catálogo de servicios incluye a este servicio físico
+    assert len(res.services) == 1
+    assert res.services[0].id == 77
+    assert res.services[0].name == "Cancha Central Pádel Las Colinas"
+    assert res.services[0].has_active_contract is True
+
+
+@pytest.mark.asyncio
+async def test_get_business_details_as_physical_service_not_found():
+    """Verifica que si el servicio físico no existe, lanza EntityNotFoundException."""
+    mock_svc_repo = MagicMock()
+    mock_svc_repo.get_by_id = AsyncMock(return_value=None)
+    mock_est_repo = MagicMock()
+
+    use_case = GetBusinessDetailsUseCase(
+        establishment_repo=mock_est_repo,
+        catalog_service_repo=mock_svc_repo,
+    )
+
+    with pytest.raises(EntityNotFoundException) as exc_info:
+        await use_case.execute(BusinessDetailsQueryDTO(business_id=999, is_service=True))
+    assert "Servicio físico con id 999 no encontrado" in str(exc_info.value)
+

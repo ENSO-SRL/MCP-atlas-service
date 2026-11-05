@@ -27,7 +27,9 @@ def register_catalog_tools(server: MCPServer) -> None:
         description=(
             "Busca establecimientos y clubes disponibles en la plataforma Atlas. "
             "Permite filtrar por término de búsqueda (nombre o zona), categoría (Pádel, Golf, Veterinaria, "
-            "Taller, Cine) y ciudad. Retorna listado paginado con identificadores de negocio (business_id)."
+            "Taller, Cine) y ciudad. Retorna listado paginado con identificadores de negocio (business_id). "
+            "Los negocios marcados con 'is_service': True son físicamente sedes/servicios gestionados vía pasarela; "
+            "para consultar sus detalles en 'get_business_details', debe enviarse 'is_service': True."
         ),
         annotations=ToolAnnotations(read_only_hint=True),
     )
@@ -64,6 +66,7 @@ def register_catalog_tools(server: MCPServer) -> None:
                     "sector": item.sector,
                     "operating_hours": item.operating_hours,
                     "rule_type": item.rule_type,
+                    "is_service": item.is_service,
                 }
                 for item in res.items
             ],
@@ -76,6 +79,8 @@ def register_catalog_tools(server: MCPServer) -> None:
         title="Obtener Detalles del Negocio",
         description=(
             "Obtiene la ficha informativa completa de un establecimiento en Atlas a partir de su business_id. "
+            "Si el negocio fue listado con 'is_service': True en search_businesses, se debe pasar 'is_service': True "
+            "para recuperar su dirección y contacto del servicio y sus reglas técnicas operativas de la pasarela padre. "
             "Devuelve ubicación física, horarios de apertura y cierre, regla de antelación para reservas, "
             "lista de servicios ofrecidos (service_id, nombre y categoría) y tarifas orientativas."
         ),
@@ -84,11 +89,15 @@ def register_catalog_tools(server: MCPServer) -> None:
     @handle_mcp_errors
     async def get_business_details(
         business_id: int,
+        is_service: bool = False,
         ctx: Optional[Context] = None,
     ) -> dict[str, Any]:
         extract_user_context(ctx, required_scope="bookings:read")
 
-        dto_query = BusinessDetailsQueryDTO(business_id=business_id)
+        dto_query = BusinessDetailsQueryDTO(
+            business_id=business_id,
+            is_service=is_service,
+        )
 
         async with get_mcp_use_cases() as uc:
             res = await uc.get_business_details.execute(dto_query)
@@ -119,6 +128,7 @@ def register_catalog_tools(server: MCPServer) -> None:
             "phone": res.phone,
             "email": res.email,
             "website": res.website,
+            "is_service": res.is_service,
         }
 
     @server.tool(

@@ -84,7 +84,7 @@ def build_mcp_use_cases(
     token_codec = SlotTokenCodec(secret=settings.MCP_TOKEN_SECRET)
 
     return MCPUseCases(
-        search_businesses=SearchBusinessesUseCase(est_repo),
+        search_businesses=SearchBusinessesUseCase(est_repo, svc_repo),
         get_business_details=GetBusinessDetailsUseCase(est_repo, svc_repo, contract_repo),
         get_service_contract=GetServiceContractUseCase(svc_repo, contract_repo),
         get_dimension_options=GetDimensionOptionsUseCase(contract_repo, dim_cache, bus_client, catalog_repo=svc_repo),

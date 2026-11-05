@@ -265,6 +265,7 @@ async def test_search_businesses_tool_execution(server, mock_use_cases):
     assert data["total_count"] == 1
     assert data["items"][0]["name"] == "Club Pádel Santo Domingo"
     assert data["items"][0]["business_id"] == 1
+    assert data["items"][0]["is_service"] is False
     mock_use_cases.search_businesses.execute.assert_awaited_once()
 
 
@@ -294,6 +295,7 @@ async def test_get_business_details_tool_execution(server, mock_use_cases):
             ],
             phone="+18095551234",
             email="info@cpbv.do",
+            is_service=False,
         )
     )
 
@@ -305,6 +307,39 @@ async def test_get_business_details_tool_execution(server, mock_use_cases):
     assert len(data["services"]) == 1
     assert data["services"][0]["service_id"] == 20
     assert data["location"]["city"] == "Santo Domingo"
+    assert data["is_service"] is False
+
+
+@pytest.mark.asyncio
+async def test_get_business_details_tool_execution_with_is_service(server, mock_use_cases):
+    """Prueba get_business_details con el flag is_service=True."""
+    mock_use_cases.get_business_details.execute = AsyncMock(
+        return_value=BusinessDetailsDTO(
+            id=77,
+            name="Cancha Central Pádel Las Colinas",
+            code="COLINAS_PADEL",
+            category="Pádel",
+            city="Santiago",
+            sector="Cerros de Gurabo",
+            address_line="Calle Principal 5",
+            operating_hours={"opening": "06:30", "closing": "23:00"},
+            rule_type="today_and_tomorrow",
+            advance_booking_rule="Reservas permitidas únicamente para hoy y mañana",
+            services=[],
+            phone="+18095557777",
+            is_service=True,
+        )
+    )
+
+    result = await server.call_tool("get_business_details", {"business_id": 77, "is_service": True})
+    data = json.loads(result.content[0].text)
+
+    assert data["business_id"] == 77
+    assert data["is_service"] is True
+    mock_use_cases.get_business_details.execute.assert_awaited_once()
+    query_dto = mock_use_cases.get_business_details.execute.call_args[0][0]
+    assert query_dto.business_id == 77
+    assert query_dto.is_service is True
 
 
 @pytest.mark.asyncio

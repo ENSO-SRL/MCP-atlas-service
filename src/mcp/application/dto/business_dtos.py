@@ -26,6 +26,7 @@ class BusinessSummaryDTO:
     address_line: Optional[str] = None
     operating_hours: dict[str, Any] = field(default_factory=dict)
     rule_type: str = "only_today"
+    is_service: bool = False  # True cuando el negocio es físicamente un servicio de pasarela
 
 
 @dataclass
@@ -40,6 +41,7 @@ class SearchBusinessesResponseDTO:
 class BusinessDetailsQueryDTO:
     """Consulta de detalle de un establecimiento específico."""
     business_id: int
+    is_service: bool = False  # True si el business_id corresponde a un servicio físico de pasarela
 
 
 @dataclass
@@ -72,3 +74,4 @@ class BusinessDetailsDTO:
     rule_type: str = "only_today"
     advance_booking_rule: str = ""
     services: list[BusinessServiceSummaryDTO] = field(default_factory=list)
+    is_service: bool = False  # True cuando es un servicio físico de pasarela
