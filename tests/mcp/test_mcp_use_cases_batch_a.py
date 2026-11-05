@@ -461,99 +461,77 @@ async def test_get_dimension_options_cache_miss_timeout_processing():
 
 
 @pytest.mark.asyncio
-async def test_search_businesses_with_gateway_establishment_completes_limit_from_query():
+async def test_search_businesses_with_gateway_establishment_unified_pagination():
     """
-    Verifica que si un establecimiento pertenece a la categoría 'Pasarelas', no se incluya
-    en los resultados y en su lugar se consulte la BD aplicando el limit restante para traer
-    sus servicios activos marcados con is_service=True.
+    Verifica que la búsqueda unificada maneje correctamente la paginación a lo largo de
+    múltiples páginas combinando establecimientos estándar (is_service=False) y servicios
+    físicos de pasarela (is_service=True), resolviendo el offset sin perder registros.
     """
+    all_unified_records = [
+        Establishment(
+            id=1,
+            name="Club Tenis Santo Domingo",
+            code="CTSD",
+            category_name="Tenis",
+            location=LocationAddress(city="Santo Domingo", sector="Piantini"),
+            opening_hour=time(7, 0),
+            closing_hour=time(22, 0),
+            rule_type=RuleType.ONLY_TODAY,
+            is_service=False,
+        ),
+        Establishment(
+            id=501,
+            name="Club Pádel Bella Vista",
+            code="PADEL_BV",
+            category_name="Pádel",
+            location=LocationAddress(city="Santo Domingo", sector="Bella Vista", street="Av. Sarasota", building_number="12"),
+            opening_hour=time(8, 0),
+            closing_hour=time(20, 0),
+            rule_type=RuleType.TODAY_AND_TOMORROW,
+            is_service=True,
+        ),
+        Establishment(
+            id=502,
+            name="Pádel City Los Prados",
+            code="PADEL_LP",
+            category_name="Pádel",
+            location=LocationAddress(city="Santo Domingo", sector="Los Prados"),
+            opening_hour=time(8, 0),
+            closing_hour=time(20, 0),
+            rule_type=RuleType.TODAY_AND_TOMORROW,
+            is_service=True,
+        ),
+    ]
+
     mock_est_repo = MagicMock()
-    mock_est_repo.search = AsyncMock(
-        return_value=[
-            Establishment(
-                id=1,
-                name="Club Tenis Santo Domingo",
-                code="CTSD",
-                category_name="Tenis",
-                location=LocationAddress(city="Santo Domingo", sector="Piantini"),
-                opening_hour=time(7, 0),
-                closing_hour=time(22, 0),
-                rule_type=RuleType.ONLY_TODAY,
-            ),
-            Establishment(
-                id=99,
-                name="Pasarela General de Reservas",
-                code="PASARELA_RES",
-                category_name="Pasarelas",
-                location=LocationAddress(city="Santo Domingo", sector="Naco"),
-                opening_hour=time(8, 0),
-                closing_hour=time(20, 0),
-                rule_type=RuleType.TODAY_AND_TOMORROW,
-            ),
-        ]
+
+    async def mock_search(query=None, category=None, zone=None, limit=20, offset=0):
+        return all_unified_records[offset: offset + limit]
+
+    mock_est_repo.search = AsyncMock(side_effect=mock_search)
+
+    use_case = SearchBusinessesUseCase(establishment_repo=mock_est_repo)
+
+    # 1. Página 1: limit=2, offset=0 -> debe traer los primeros 2 y next_cursor=2
+    res_page_1 = await use_case.execute(
+        SearchBusinessesQueryDTO(query="pádel", limit=2, cursor=0)
     )
+    assert len(res_page_1.items) == 2
+    assert res_page_1.items[0].id == 1
+    assert res_page_1.items[0].is_service is False
+    assert res_page_1.items[1].id == 501
+    assert res_page_1.items[1].is_service is True
+    assert res_page_1.next_cursor == 2
 
-    mock_svc_repo = MagicMock()
-    mock_svc_repo.list_by_establishment = AsyncMock(
-        return_value=[
-            CatalogService(
-                id=501,
-                establishment_id=99,
-                name="Club Pádel Bella Vista",
-                category_name="Pádel",
-                combo_code="PADEL_BV",
-                location=LocationAddress(city="Santo Domingo", sector="Bella Vista", street="Av. Sarasota", building_number="12"),
-                contact=ContactInfo(phone="+18095558888"),
-            ),
-            CatalogService(
-                id=502,
-                establishment_id=99,
-                name="Pádel City Los Prados",
-                category_name="Pádel",
-                combo_code="PADEL_LP",
-                location=LocationAddress(city="Santo Domingo", sector="Los Prados"),
-                contact=ContactInfo(phone="+18095559999"),
-            ),
-        ]
+    # 2. Página 2: limit=2, offset=2 -> debe traer el 3er elemento (servicio de pasarela) sin perderse
+    res_page_2 = await use_case.execute(
+        SearchBusinessesQueryDTO(query="pádel", limit=2, cursor=2)
     )
-
-    use_case = SearchBusinessesUseCase(
-        establishment_repo=mock_est_repo,
-        catalog_service_repo=mock_svc_repo,
-    )
-
-    # Buscamos con limit=3
-    result = await use_case.execute(
-        SearchBusinessesQueryDTO(query="pádel", limit=3, cursor=0)
-    )
-
-    # Verificamos que se llamó list_by_establishment con limit restante = 3 - 1 = 2 directamente en la BD
-    mock_svc_repo.list_by_establishment.assert_awaited_once_with(
-        establishment_id=99,
-        limit=2,
-    )
-
-    # La lista debe tener 3 items en total
-    assert len(result.items) == 3
-
-    # El primero es el establecimiento tradicional
-    assert result.items[0].id == 1
-    assert result.items[0].name == "Club Tenis Santo Domingo"
-    assert result.items[0].is_service is False
-
-    # La pasarela (id=99) fue excluida y reemplazada por sus servicios
-    assert not any(item.id == 99 for item in result.items)
-
-    # Los siguientes dos son los servicios de la pasarela marcados con is_service=True
-    assert result.items[1].id == 501
-    assert result.items[1].name == "Club Pádel Bella Vista"
-    assert result.items[1].sector == "Bella Vista"
-    assert result.items[1].rule_type == "today_and_tomorrow"  # Heredado de la pasarela
-    assert result.items[1].is_service is True
-
-    assert result.items[2].id == 502
-    assert result.items[2].name == "Pádel City Los Prados"
-    assert result.items[2].is_service is True
+    assert len(res_page_2.items) == 1
+    assert res_page_2.items[0].id == 502
+    assert res_page_2.items[0].name == "Pádel City Los Prados"
+    assert res_page_2.items[0].is_service is True
+    assert res_page_2.next_cursor is None  # Última página
 
 
 @pytest.mark.asyncio

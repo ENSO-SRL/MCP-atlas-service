@@ -95,6 +95,63 @@ async def test_sql_establishment_repository_mapping_and_get():
 
 
 @pytest.mark.anyio
+async def test_sql_establishment_repository_search_unified():
+    """Verifica que search() procese correctamente el resultado mapeado de UNION ALL."""
+    mock_session = AsyncMock()
+
+    mock_row_1 = {
+        "id": 1,
+        "name": "Club Tenis Piantini",
+        "code": "CTP",
+        "category_name": "Tenis",
+        "city": "Santo Domingo",
+        "sector": "Piantini",
+        "street": "Calle 1",
+        "building_number": "10",
+        "postal_code": "10100",
+        "opening_hour": time(7, 0),
+        "closing_hour": time(22, 0),
+        "rule_type": "only_today",
+        "is_service": False,
+    }
+    mock_row_2 = {
+        "id": 18,
+        "name": "Grove Padel Club",
+        "code": "GROVE_PADEL",
+        "category_name": "Pádel",
+        "city": "Santo Domingo",
+        "sector": "Naco",
+        "street": "Av. Tiradentes",
+        "building_number": "45",
+        "postal_code": "10120",
+        "opening_hour": time(6, 0),
+        "closing_hour": time(23, 0),
+        "rule_type": None,
+        "is_service": True,
+    }
+
+    mock_mappings = MagicMock()
+    mock_mappings.all.return_value = [mock_row_1, mock_row_2]
+    mock_result = MagicMock()
+    mock_result.mappings.return_value = mock_mappings
+    mock_session.execute.return_value = mock_result
+
+    repo = SqlEstablishmentRepository(session=mock_session)
+    results = await repo.search(query="Padel", limit=10, offset=0)
+
+    assert len(results) == 2
+    assert results[0].id == 1
+    assert results[0].name == "Club Tenis Piantini"
+    assert results[0].is_service is False
+
+    assert results[1].id == 18
+    assert results[1].name == "Grove Padel Club"
+    assert results[1].is_service is True
+    assert results[1].location.sector == "Naco"
+    assert results[1].rule_type is None
+
+
+@pytest.mark.anyio
 async def test_sql_catalog_service_repository_mapping_and_list():
     mock_session = AsyncMock()
 

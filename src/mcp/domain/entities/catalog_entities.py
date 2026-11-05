@@ -28,6 +28,7 @@ class Establishment(Entity[int]):
     contact: ContactInfo = field(default_factory=ContactInfo)
     category_name: Optional[str] = None
     configuration: dict = field(default_factory=dict)
+    is_service: bool = False
 
     def determine_availability_mode(
         self, target_date: date, reference_date: Optional[date] = None
