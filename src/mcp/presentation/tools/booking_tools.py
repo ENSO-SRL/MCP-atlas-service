@@ -11,6 +11,7 @@ from src.mcp.application.dto.booking_dtos import (
     CreateBookingInputDTO,
     GetBookingStatusQueryDTO,
     ListMyBookingsQueryDTO,
+    ResolveBookingNoticeInputDTO,
 )
 from src.mcp.domain.exceptions.mcp_exceptions import ContractValidationException
 from src.mcp.presentation.auth_context import extract_user_context
@@ -79,6 +80,7 @@ def register_booking_tools(server: MCPServer) -> None:
             "Consulta el estado y trazabilidad en tiempo real de una reserva en Atlas. "
             "Garantiza aislamiento estricto por usuario y devuelve una explicación humana del estado "
             "(requested: en trámite inicial; accepted: en cola del Queuer; confirmed: con localizador; "
+            "requires_confirmation: en pausa por aviso o discrepancia de tarifas; "
             "rejected/failed: con motivo; cancel_requested: cancelación en trámite)."
         ),
         annotations=ToolAnnotations(read_only_hint=True),
@@ -116,6 +118,32 @@ def register_booking_tools(server: MCPServer) -> None:
             "price_estimate": res.price_estimate,
             "external_ref": res.external_ref,
             "assigned_details": res.assigned_details,
+            "notices": [
+                {
+                    "notice_id": str(n.id),
+                    "notice_type": n.notice_type,
+                    "status": n.status,
+                    "message": n.message,
+                    "details": n.payload,
+                    "requires_action": n.requires_action,
+                    "created_at": n.created_at.isoformat(),
+                    "resolved_at": n.resolved_at.isoformat() if n.resolved_at else None,
+                    "resolution_action": n.resolution_action,
+                }
+                for n in res.notices
+            ],
+            "pending_notices": [
+                {
+                    "notice_id": str(n.id),
+                    "notice_type": n.notice_type,
+                    "status": n.status,
+                    "message": n.message,
+                    "details": n.payload,
+                    "requires_action": n.requires_action,
+                    "created_at": n.created_at.isoformat(),
+                }
+                for n in res.pending_notices
+            ],
             "expires_at": res.expires_at.isoformat() if res.expires_at else None,
             "created_at": res.created_at.isoformat(),
             "updated_at": res.updated_at.isoformat(),
@@ -127,8 +155,9 @@ def register_booking_tools(server: MCPServer) -> None:
         title="Listar Mis Reservas",
         description=(
             "Lista el historial paginado de solicitudes y reservas del usuario autenticado. "
-            "Permite filtrar por estado (requested, accepted, confirmed, rejected, failed, expired, "
-            "cancel_requested, cancelled). Preserva los applied_filters y resuelve nombres de servicios."
+            "Permite filtrar por estado (requested, accepted, confirmed, requires_confirmation, "
+            "rejected, failed, expired, cancel_requested, cancelled). Preserva los applied_filters "
+            "y resuelve nombres de servicios."
         ),
         annotations=ToolAnnotations(read_only_hint=True),
     )
@@ -176,7 +205,7 @@ def register_booking_tools(server: MCPServer) -> None:
         description=(
             "Solicita la cancelación de una reserva activa en Atlas. Operación destructiva que requiere "
             "confirmación previa del usuario en el chat. Válida únicamente para reservas en estado "
-            "requested, accepted o confirmed."
+            "requested, accepted, confirmed o requires_confirmation."
         ),
         annotations=ToolAnnotations(destructive_hint=True),
     )
@@ -207,5 +236,64 @@ def register_booking_tools(server: MCPServer) -> None:
         return {
             "booking_id": str(res.booking_id),
             "status": res.status,
+            "message": res.message,
+        }
+
+    @server.tool(
+        name="resolve_booking_notice",
+        title="Resolver Aviso o Solicitud de Confirmación de Reserva",
+        description=(
+            "Resuelve una alerta o solicitud de confirmación sobre una reserva pausada (estado 'requires_confirmation'). "
+            "Esto ocurre ante discrepancias de precio o condiciones reportadas por el club. "
+            "El usuario decide aceptar ('accept') o rechazar ('reject') el aviso. "
+            "Si se acepta y no quedan avisos pendientes, la reserva reanuda su trámite automáticamente hacia la sede. "
+            "Si se rechaza, la reserva queda cancelada/rechazada definitivamente."
+        ),
+        annotations=ToolAnnotations(idempotent_hint=False, destructive_hint=False),
+    )
+    @handle_mcp_errors
+    async def resolve_booking_notice(
+        booking_id: str,
+        decision: str,
+        notice_id: Optional[str] = None,
+        ctx: Optional[Context] = None,
+    ) -> dict[str, Any]:
+        user = extract_user_context(ctx, required_scope="bookings:write")
+
+        try:
+            b_uuid = UUID(booking_id)
+        except ValueError:
+            raise ContractValidationException(f"El identificador 'booking_id' '{booking_id}' no es un UUID válido.")
+
+        n_uuid: Optional[UUID] = None
+        if notice_id:
+            try:
+                n_uuid = UUID(notice_id)
+            except ValueError:
+                raise ContractValidationException(f"El identificador 'notice_id' '{notice_id}' no es un UUID válido.")
+
+        decision_norm = decision.strip().lower()
+        if decision_norm not in ("accept", "reject"):
+            raise ContractValidationException(
+                f"El valor de 'decision' '{decision}' es inválido. Debe ser 'accept' o 'reject'."
+            )
+
+        dto_input = ResolveBookingNoticeInputDTO(
+            booking_id=b_uuid,
+            user_uuid=user.user_uuid,
+            decision=decision_norm,
+            notice_id=n_uuid,
+            user_phone=user.phone_number,
+            user_email=user.email,
+        )
+
+        async with get_mcp_use_cases() as uc:
+            res = await uc.resolve_booking_notice.execute(dto_input)
+
+        return {
+            "booking_id": str(res.booking_id),
+            "status": res.status,
+            "decision": res.decision,
+            "resolved_notice_ids": [str(nid) for nid in res.resolved_notice_ids],
             "message": res.message,
         }

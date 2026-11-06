@@ -1,4 +1,5 @@
 from src.mcp.infrastructure.persistence.models.booking_models import (
+    BookingNoticeModel,
     BookingRequestModel,
     BookingStatusHistoryModel,
     InboxEventModel,
@@ -31,6 +32,7 @@ __all__ = [
     "ServicePricingPolicyModel",
     "ServicePriceRuleModel",
     "BookingRequestModel",
+    "BookingNoticeModel",
     "BookingStatusHistoryModel",
     "OutboxEventModel",
     "InboxEventModel",

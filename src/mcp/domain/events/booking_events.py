@@ -65,3 +65,22 @@ class CancellationConfirmedEvent(DomainEvent):
 class CancellationRejectedEvent(DomainEvent):
     booking_id: UUID = field(default_factory=uuid4)
     reason: Optional[str] = None
+
+
+@dataclass
+class BookingNoticeRaisedEvent(DomainEvent):
+    """Emitido cuando se levanta una alerta o discrepancia que pausa la reserva."""
+    booking_id: UUID = field(default_factory=uuid4)
+    notice_id: UUID = field(default_factory=uuid4)
+    notice_type: str = ""
+    message: str = ""
+    payload: dict[str, Any] = field(default_factory=dict)
+    requires_action: bool = True
+
+
+@dataclass
+class BookingResumedEvent(DomainEvent):
+    """Emitido cuando el usuario resuelve favorablemente los avisos y la reserva se reanuda."""
+    booking_id: UUID = field(default_factory=uuid4)
+    accepted_notice_ids: list[UUID] = field(default_factory=list)
+

@@ -4,6 +4,7 @@ from typing import Any, Optional
 
 from src.mcp.application.dto.booking_dtos import (
     BookingDetailsDTO,
+    BookingNoticeDTO,
     GetBookingStatusQueryDTO,
 )
 from src.mcp.domain.enums.mcp_enums import BookingStatus
@@ -62,7 +63,24 @@ class GetBookingStatusUseCase:
                 "informative": booking.price_estimate.informative,
             }
 
-        # 4. Generar explicación contextual del estado
+        # 4. Avisos y solicitudes de confirmación
+        notices_dto = [
+            BookingNoticeDTO(
+                id=n.id,
+                notice_type=n.notice_type.value,
+                status=n.status.value,
+                message=n.message,
+                payload=n.payload,
+                requires_action=n.requires_action,
+                created_at=n.created_at,
+                resolved_at=n.resolved_at,
+                resolution_action=n.resolution_action,
+            )
+            for n in getattr(booking, "notices", []) or []
+        ]
+        pending_notices_dto = [n for n in notices_dto if n.status == "pending"]
+
+        # 5. Generar explicación contextual del estado
         explanation = "Estado de reserva desconocido."
         if booking.status == BookingStatus.REQUESTED:
             explanation = "La solicitud fue recibida y está en trámite de validación inicial."
@@ -70,6 +88,12 @@ class GetBookingStatusUseCase:
             explanation = (
                 "La solicitud fue aceptada por la sede o puesta en cola en el sistema Queuer; "
                 "está en trámite pendiente de confirmación definitiva."
+            )
+        elif booking.status == BookingStatus.REQUIRES_CONFIRMATION:
+            pending_count = len([n for n in pending_notices_dto if n.requires_action])
+            explanation = (
+                f"La reserva está en pausa ({pending_count} aviso(s) pendiente(s) de confirmación). "
+                "El establecimiento o el sistema reporta cambios en tarifas o condiciones que requieren la aprobación del usuario."
             )
         elif booking.status == BookingStatus.CONFIRMED:
             ref_str = f" Localizador: {booking.external_ref}." if booking.external_ref else ""
@@ -105,6 +129,8 @@ class GetBookingStatusUseCase:
             price_estimate=price_dict,
             external_ref=booking.external_ref,
             assigned_details=booking.assigned_details,
+            notices=notices_dto,
+            pending_notices=pending_notices_dto,
             expires_at=booking.expires_at,
             created_at=booking.created_at,
             updated_at=booking.updated_at,

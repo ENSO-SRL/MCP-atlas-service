@@ -6,6 +6,7 @@ from uuid import UUID, uuid4
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     DateTime,
     ForeignKey,
     Integer,
@@ -57,6 +58,30 @@ class BookingRequestModel(Base):
     history: Mapped[list[BookingStatusHistoryModel]] = relationship(
         back_populates="booking", cascade="all, delete-orphan"
     )
+    notices: Mapped[list[BookingNoticeModel]] = relationship(
+        back_populates="booking", cascade="all, delete-orphan", lazy="selectin"
+    )
+
+
+class BookingNoticeModel(Base):
+    """Modelo ORM para mcp.booking_notice (avisos y discrepancias de confirmación)."""
+    __tablename__ = "booking_notice"
+    __table_args__ = {"schema": "mcp"}
+
+    id: Mapped[UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    booking_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("mcp.booking_request.id", ondelete="CASCADE"), nullable=False
+    )
+    notice_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    status: Mapped[str] = mapped_column(String(30), default="pending", nullable=False)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
+    requires_action: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    resolution_action: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
+
+    booking: Mapped[BookingRequestModel] = relationship(back_populates="notices")
 
 
 class BookingStatusHistoryModel(Base):

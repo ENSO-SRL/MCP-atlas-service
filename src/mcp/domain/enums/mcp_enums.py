@@ -11,6 +11,23 @@ class BookingStatus(str, Enum):
     EXPIRED = "expired"
     CANCEL_REQUESTED = "cancel_requested"
     CANCELLED = "cancelled"
+    REQUIRES_CONFIRMATION = "requires_confirmation"
+
+
+class NoticeType(str, Enum):
+    """Tipos de alertas o avisos de confirmación en una reserva."""
+    PRICE_DISCREPANCY = "price_discrepancy"         # Ajuste en la tarifa respecto al estimado
+    SCHEDULE_SHIFT = "schedule_shift"               # Desfase o ajuste de horario propuesto por la sede
+    RESOURCE_REASSIGNED = "resource_reassigned"     # Cambio de cancha, pista o recurso asignado
+    GENERAL_NOTICE = "general_notice"               # Aviso operativo general que requiere aprobación
+
+
+class NoticeStatus(str, Enum):
+    """Estado de resolución de un aviso de reserva."""
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+    EXPIRED = "expired"
 
 
 class AvailabilityPattern(str, Enum):

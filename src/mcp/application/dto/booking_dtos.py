@@ -43,6 +43,20 @@ class GetBookingStatusQueryDTO:
 
 
 @dataclass
+class BookingNoticeDTO:
+    """Detalle de una alerta o solicitud de confirmación sobre una reserva."""
+    id: UUID
+    notice_type: str
+    status: str
+    message: str
+    payload: dict[str, Any] = field(default_factory=dict)
+    requires_action: bool = True
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    resolved_at: Optional[datetime] = None
+    resolution_action: Optional[str] = None
+
+
+@dataclass
 class BookingDetailsDTO:
     """Detalle completo de una reserva con trazabilidad contextual."""
     booking_id: UUID
@@ -60,6 +74,8 @@ class BookingDetailsDTO:
     price_estimate: Optional[dict[str, Any]] = None
     external_ref: Optional[str] = None
     assigned_details: Optional[dict[str, Any]] = None
+    notices: list[BookingNoticeDTO] = field(default_factory=list)
+    pending_notices: list[BookingNoticeDTO] = field(default_factory=list)
     expires_at: Optional[datetime] = None
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
@@ -113,3 +129,24 @@ class CancellationResultDTO:
     booking_id: UUID
     status: str  # "cancel_requested", "cancelled"
     message: str
+
+
+@dataclass
+class ResolveBookingNoticeInputDTO:
+    """Parámetros para resolver avisos o solicitudes de confirmación sobre una reserva."""
+    booking_id: UUID
+    user_uuid: UUID
+    decision: str  # "accept" | "reject"
+    notice_id: Optional[UUID] = None
+    user_phone: Optional[str] = None
+    user_email: Optional[str] = None
+
+
+@dataclass
+class ResolveBookingNoticeResultDTO:
+    """Resultado del proceso de resolución de avisos de reserva."""
+    booking_id: UUID
+    status: str
+    decision: str
+    resolved_notice_ids: list[UUID] = field(default_factory=list)
+    message: str = ""

@@ -17,6 +17,7 @@ from src.mcp.application.use_cases.operation_helpers import (
     GENERIC_INTERNAL_ERROR_MESSAGE,
     resolve_operation_error,
 )
+from src.mcp.application.use_cases.resolve_booking_notice import ResolveBookingNoticeUseCase
 from src.mcp.application.use_cases.search_businesses import SearchBusinessesUseCase
 
 __all__ = [
@@ -32,6 +33,7 @@ __all__ = [
     "GetBookingStatusUseCase",
     "ListMyBookingsUseCase",
     "CancelBookingUseCase",
+    "ResolveBookingNoticeUseCase",
     "GENERIC_INTERNAL_ERROR_MESSAGE",
     "resolve_operation_error",
 ]

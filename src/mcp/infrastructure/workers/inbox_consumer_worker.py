@@ -142,6 +142,16 @@ class InboxConsumerWorker:
                                 reason=event_payload.get("reason", "Fallo técnico en trámite")
                             )
                             release_hold_needed = True
+                        elif event_type in ("BookingNoticeRaised", "BookingConfirmationRequested"):
+                            raw_notice_id = event_payload.get("notice_id")
+                            notice_id = UUID(raw_notice_id) if raw_notice_id else uuid4()
+                            booking.raise_notice(
+                                notice_type=event_payload.get("notice_type", "price_discrepancy"),
+                                message=event_payload.get("message", "Aviso del establecimiento"),
+                                payload=event_payload.get("details") or event_payload.get("payload") or {},
+                                requires_action=event_payload.get("requires_action", True),
+                                notice_id=notice_id,
+                            )
                         elif event_type == "CancellationConfirmed":
                             booking.confirm_cancellation()
                             release_hold_needed = True

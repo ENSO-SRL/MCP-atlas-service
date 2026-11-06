@@ -144,7 +144,7 @@ CREATE TABLE IF NOT EXISTS mcp.booking_request (
     contract_version_id  uuid NOT NULL REFERENCES mcp.service_contract_version (id) ON DELETE RESTRICT,
     status               text NOT NULL DEFAULT 'requested'
                          CHECK (status IN ('requested', 'accepted', 'confirmed', 'rejected', 'failed',
-                                           'expired', 'cancel_requested', 'cancelled')),
+                                           'expired', 'cancel_requested', 'cancelled', 'requires_confirmation')),
     status_reason        text,
     idempotency_key      text NOT NULL,
     request_fingerprint  text NOT NULL,
@@ -173,10 +173,27 @@ CREATE INDEX IF NOT EXISTS ix_booking_user_created
 
 CREATE INDEX IF NOT EXISTS ix_booking_expiry
     ON mcp.booking_request (expires_at)
-    WHERE status IN ('requested', 'accepted');
+    WHERE status IN ('requested', 'accepted', 'requires_confirmation');
 
 CREATE INDEX IF NOT EXISTS ix_booking_service_slot
     ON mcp.booking_request (service_id, slot_start);
+
+CREATE TABLE IF NOT EXISTS mcp.booking_notice (
+    id                  uuid PRIMARY KEY,
+    booking_id          uuid NOT NULL REFERENCES mcp.booking_request (id) ON DELETE CASCADE,
+    notice_type         text NOT NULL,
+    status              text NOT NULL DEFAULT 'pending'
+                        CHECK (status IN ('pending', 'accepted', 'rejected', 'expired')),
+    message             text NOT NULL,
+    payload             jsonb NOT NULL DEFAULT '{}'::jsonb,
+    requires_action     boolean NOT NULL DEFAULT true,
+    created_at          timestamptz NOT NULL DEFAULT now(),
+    resolved_at         timestamptz,
+    resolution_action   text
+);
+
+CREATE INDEX IF NOT EXISTS ix_booking_notice_booking
+    ON mcp.booking_notice (booking_id, status);
 
 CREATE TABLE IF NOT EXISTS mcp.booking_status_history (
     id           bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,

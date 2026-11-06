@@ -17,6 +17,7 @@ from src.mcp.application.use_cases import (
     GetOperationResultUseCase,
     GetServiceContractUseCase,
     ListMyBookingsUseCase,
+    ResolveBookingNoticeUseCase,
     SearchBusinessesUseCase,
 )
 from src.mcp.infrastructure.persistence.repositories.sql_booking_repository import (
@@ -59,6 +60,7 @@ class MCPUseCases:
     get_booking_status: GetBookingStatusUseCase
     list_my_bookings: ListMyBookingsUseCase
     cancel_booking: CancelBookingUseCase
+    resolve_booking_notice: ResolveBookingNoticeUseCase
 
 
 def build_mcp_use_cases(
@@ -105,6 +107,7 @@ def build_mcp_use_cases(
         get_booking_status=GetBookingStatusUseCase(booking_repo, svc_repo, est_repo),
         list_my_bookings=ListMyBookingsUseCase(booking_repo, svc_repo),
         cancel_booking=CancelBookingUseCase(booking_repo, outbox_repo, catalog_repo=svc_repo),
+        resolve_booking_notice=ResolveBookingNoticeUseCase(booking_repo, outbox_repo, catalog_repo=svc_repo),
     )
 
 

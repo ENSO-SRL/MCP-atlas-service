@@ -6,12 +6,15 @@ from typing import Any, Optional
 from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
+from src.mcp.domain.entities.booking_notice import BookingNotice
 from src.mcp.domain.entities.booking_request import BookingRequest
-from src.mcp.domain.enums.mcp_enums import BookingStatus, CalculationBasis
+from src.mcp.domain.enums.mcp_enums import BookingStatus, CalculationBasis, NoticeStatus, NoticeType
 from src.mcp.domain.ports.mcp_ports import IBookingRepository
 from src.mcp.domain.value_objects.booking_vo import PriceEstimate
 from src.mcp.infrastructure.persistence.models.booking_models import (
+    BookingNoticeModel,
     BookingRequestModel,
     BookingStatusHistoryModel,
 )
@@ -30,6 +33,21 @@ def _dict_to_price_estimate(data: Optional[dict[str, Any]]) -> Optional[PriceEst
     )
 
 
+def _notice_model_to_domain(m: BookingNoticeModel) -> BookingNotice:
+    return BookingNotice(
+        id=m.id,
+        booking_id=m.booking_id,
+        notice_type=NoticeType(m.notice_type),
+        status=NoticeStatus(m.status),
+        message=m.message,
+        payload=m.payload or {},
+        requires_action=m.requires_action,
+        created_at=m.created_at,
+        resolved_at=m.resolved_at,
+        resolution_action=m.resolution_action,
+    )
+
+
 class SqlBookingRepository(IBookingRepository):
     """
     Implementación SQL del puerto IBookingRepository.
@@ -42,6 +60,10 @@ class SqlBookingRepository(IBookingRepository):
 
     @staticmethod
     def _to_domain(model: BookingRequestModel) -> BookingRequest:
+        notices = [
+            _notice_model_to_domain(n)
+            for n in (getattr(model, "notices", []) or [])
+        ]
         return BookingRequest(
             id=model.id,
             user_uuid=model.user_uuid,
@@ -63,13 +85,16 @@ class SqlBookingRepository(IBookingRepository):
             expires_at=model.expires_at,
             external_ref=model.external_ref,
             assigned_details=model.assigned_details,
+            notices=notices,
             version=model.version,
             created_at=model.created_at,
             updated_at=model.updated_at,
         )
 
     async def save(self, booking: BookingRequest) -> BookingRequest:
-        model = await self._session.get(BookingRequestModel, booking.id)
+        model = await self._session.get(
+            BookingRequestModel, booking.id, options=[selectinload(BookingRequestModel.notices)]
+        )
         now_utc = datetime.now(timezone.utc)
 
         price_dict = booking.price_estimate.to_dict() if booking.price_estimate else None
@@ -101,6 +126,22 @@ class SqlBookingRepository(IBookingRepository):
                 created_at=booking.created_at,
                 updated_at=booking.updated_at,
             )
+            # Agregar notices si los hubiera
+            for domain_notice in booking.notices:
+                m_notice = BookingNoticeModel(
+                    id=domain_notice.id,
+                    booking_id=booking.id,
+                    notice_type=domain_notice.notice_type.value,
+                    status=domain_notice.status.value,
+                    message=domain_notice.message,
+                    payload=domain_notice.payload,
+                    requires_action=domain_notice.requires_action,
+                    created_at=domain_notice.created_at,
+                    resolved_at=domain_notice.resolved_at,
+                    resolution_action=domain_notice.resolution_action,
+                )
+                model.notices.append(m_notice)
+
             history = BookingStatusHistoryModel(
                 booking_id=booking.id,
                 from_status=None,
@@ -131,19 +172,51 @@ class SqlBookingRepository(IBookingRepository):
             model.version = booking.version
             model.updated_at = booking.updated_at or now_utc
 
+            # Sincronizar notices existentes y nuevos
+            existing_notices_by_id = {n.id: n for n in (model.notices or [])}
+            for domain_notice in booking.notices:
+                if domain_notice.id in existing_notices_by_id:
+                    m_n = existing_notices_by_id[domain_notice.id]
+                    m_n.status = domain_notice.status.value
+                    m_n.message = domain_notice.message
+                    m_n.payload = domain_notice.payload
+                    m_n.requires_action = domain_notice.requires_action
+                    m_n.resolved_at = domain_notice.resolved_at
+                    m_n.resolution_action = domain_notice.resolution_action
+                else:
+                    new_m_n = BookingNoticeModel(
+                        id=domain_notice.id,
+                        booking_id=booking.id,
+                        notice_type=domain_notice.notice_type.value,
+                        status=domain_notice.status.value,
+                        message=domain_notice.message,
+                        payload=domain_notice.payload,
+                        requires_action=domain_notice.requires_action,
+                        created_at=domain_notice.created_at,
+                        resolved_at=domain_notice.resolved_at,
+                        resolution_action=domain_notice.resolution_action,
+                    )
+                    model.notices.append(new_m_n)
+
         await self._session.flush()
         return booking
 
     async def get_by_id(self, booking_id: UUID) -> Optional[BookingRequest]:
-        model = await self._session.get(BookingRequestModel, booking_id)
+        model = await self._session.get(
+            BookingRequestModel, booking_id, options=[selectinload(BookingRequestModel.notices)]
+        )
         return self._to_domain(model) if model else None
 
     async def get_by_idempotency_key(
         self, user_uuid: UUID, idempotency_key: str
     ) -> Optional[BookingRequest]:
-        stmt = select(BookingRequestModel).where(
-            BookingRequestModel.user_uuid == user_uuid,
-            BookingRequestModel.idempotency_key == idempotency_key,
+        stmt = (
+            select(BookingRequestModel)
+            .options(selectinload(BookingRequestModel.notices))
+            .where(
+                BookingRequestModel.user_uuid == user_uuid,
+                BookingRequestModel.idempotency_key == idempotency_key,
+            )
         )
         result = await self._session.execute(stmt)
         model = result.scalar_one_or_none()
@@ -156,7 +229,11 @@ class SqlBookingRepository(IBookingRepository):
         limit: int = 20,
         offset: int = 0,
     ) -> list[BookingRequest]:
-        stmt = select(BookingRequestModel).where(BookingRequestModel.user_uuid == user_uuid)
+        stmt = (
+            select(BookingRequestModel)
+            .options(selectinload(BookingRequestModel.notices))
+            .where(BookingRequestModel.user_uuid == user_uuid)
+        )
 
         if status:
             stmt = stmt.where(BookingRequestModel.status == status.value)

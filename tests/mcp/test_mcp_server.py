@@ -21,6 +21,7 @@ from src.mcp.application.dto.booking_dtos import (
     BookingSummaryDTO,
     CancellationResultDTO,
     ListMyBookingsResponseDTO,
+    ResolveBookingNoticeResultDTO,
 )
 from src.mcp.application.dto.business_dtos import (
     BusinessDetailsDTO,
@@ -63,6 +64,7 @@ def mock_use_cases():
         get_booking_status=MagicMock(),
         list_my_bookings=MagicMock(),
         cancel_booking=MagicMock(),
+        resolve_booking_notice=MagicMock(),
     )
 
 
@@ -102,10 +104,11 @@ async def test_server_registers_all_10_tools(server):
         "get_booking_status",
         "list_my_bookings",
         "cancel_booking",
+        "resolve_booking_notice",
     }
 
     assert tool_names == expected_tools
-    assert len(tools) == 10
+    assert len(tools) == 11
 
 
 @pytest.mark.asyncio
@@ -500,6 +503,32 @@ async def test_cancel_booking_tool_execution(server, mock_use_cases):
     assert data["status"] == "cancel_requested"
 
 
+@pytest.mark.asyncio
+async def test_resolve_booking_notice_tool_execution(server, mock_use_cases):
+    """Prueba la invocación de la tool resolve_booking_notice."""
+    booking_id = uuid4()
+    mock_use_cases.resolve_booking_notice.execute = AsyncMock(
+        return_value=ResolveBookingNoticeResultDTO(
+            booking_id=booking_id,
+            status="accepted",
+            decision="accept",
+            resolved_notice_ids=[uuid4()],
+            message="Avisos confirmados exitosamente.",
+        )
+    )
+
+    result = await server.call_tool(
+        "resolve_booking_notice",
+        {"booking_id": str(booking_id), "decision": "accept"},
+    )
+    data = json.loads(result.content[0].text)
+
+    assert data["booking_id"] == str(booking_id)
+    assert data["status"] == "accepted"
+    assert data["decision"] == "accept"
+    assert "confirmados" in data["message"]
+
+
 # =========================================================================
 # 6. Manejo Resiliente de Excepciones de Dominio
 # =========================================================================
@@ -551,6 +580,7 @@ def test_build_mcp_use_cases_factory():
     assert container.get_booking_status is not None
     assert container.list_my_bookings is not None
     assert container.cancel_booking is not None
+    assert container.resolve_booking_notice is not None
 
 
 @pytest.mark.anyio
