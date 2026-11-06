@@ -9,7 +9,25 @@
 BEGIN;
 
 -- 1. Actualizar restricción CHECK en mcp.booking_request para admitir 'requires_confirmation'
-ALTER TABLE mcp.booking_request DROP CONSTRAINT IF EXISTS booking_request_status_check;
+-- Elimina de forma dinámica cualquier constraint CHECK previo sobre la columna 'status'
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN (
+        SELECT conname
+        FROM pg_constraint c
+        JOIN pg_namespace n ON n.oid = c.connamespace
+        JOIN pg_class cl ON cl.oid = c.conrelid
+        JOIN pg_attribute a ON a.attrelid = cl.oid AND a.attnum = ANY(c.conkey)
+        WHERE n.nspname = 'mcp'
+          AND cl.relname = 'booking_request'
+          AND a.attname = 'status'
+          AND c.contype = 'c'
+    ) LOOP
+        EXECUTE 'ALTER TABLE mcp.booking_request DROP CONSTRAINT IF EXISTS ' || quote_ident(r.conname);
+    END LOOP;
+END $$;
 
 ALTER TABLE mcp.booking_request ADD CONSTRAINT booking_request_status_check
     CHECK (status IN (
