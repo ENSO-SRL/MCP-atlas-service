@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from typing import Any, Optional
 from uuid import UUID, uuid4
 
@@ -13,7 +14,11 @@ from src.mcp.application.dto.booking_dtos import (
     CreateBookingInputDTO,
 )
 from src.mcp.domain.entities.booking_request import BookingRequest
-from src.mcp.domain.enums.mcp_enums import AvailabilityPattern, BookingStatus
+from src.mcp.domain.enums.mcp_enums import (
+    AvailabilityPattern,
+    BookingStatus,
+    CalculationBasis,
+)
 from src.mcp.domain.exceptions.mcp_exceptions import (
     BookingRuleViolationException,
     ContractValidationException,
@@ -27,6 +32,7 @@ from src.mcp.domain.ports.mcp_ports import (
     IHoldManager,
     IOutboxRepository,
 )
+from src.mcp.domain.value_objects.booking_vo import PriceEstimate
 from src.mcp.infrastructure.security.slot_token_codec import SlotTokenCodec
 
 
@@ -177,8 +183,20 @@ class CreateBookingRequestUseCase:
                     )
                 hold_id = f"hold:{offer_ref}"
 
+
         # 7. Persistencia de la Reserva e Historial (Transacción ACID)
         expires_at = datetime.now(timezone.utc) + timedelta(seconds=contract.request_ttl_seconds)
+        price_estimate = None
+        if projected_total is not None:
+            price_estimate = PriceEstimate(
+                amount=Decimal(str(projected_total)),
+                currency="DOP",
+                basis=CalculationBasis.PER_BOOKING,
+                label="Tarifa estimada",
+                informative=True,
+                note="Precio calculado",
+            )
+
         booking = BookingRequest(
             id=booking_id,
             user_uuid=query.user_uuid,
@@ -194,6 +212,7 @@ class CreateBookingRequestUseCase:
             slot_end=slot_end,
             applied_filters=applied_filters,
             fields=query.fields,
+            price_estimate=price_estimate,
             expires_at=expires_at,
         )
         await self._booking_repo.save(booking)
