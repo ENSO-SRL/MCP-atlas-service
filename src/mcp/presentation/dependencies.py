@@ -15,8 +15,10 @@ from src.mcp.application.use_cases import (
     GetBusinessDetailsUseCase,
     GetDimensionOptionsUseCase,
     GetOperationResultUseCase,
+    GetReservationObjectSchemasUseCase,
     GetSeatMapUseCase,
     GetServiceContractUseCase,
+    GetUserReservationObjectsUseCase,
     ListMyBookingsUseCase,
     ResolveBookingNoticeUseCase,
     SearchBusinessesUseCase,
@@ -35,6 +37,9 @@ from src.mcp.infrastructure.persistence.repositories.sql_establishment_repositor
 )
 from src.mcp.infrastructure.persistence.repositories.sql_outbox_repository import (
     SqlOutboxRepository,
+)
+from src.mcp.infrastructure.persistence.repositories.sql_reservation_object_repository import (
+    SqlReservationObjectRepository,
 )
 from src.mcp.infrastructure.redis.redis_bus_client import RedisBusClient
 from src.mcp.infrastructure.redis.redis_cache_manager import (
@@ -64,6 +69,8 @@ class MCPUseCases:
     cancel_booking: CancelBookingUseCase
     resolve_booking_notice: ResolveBookingNoticeUseCase
     get_seat_map: GetSeatMapUseCase
+    get_reservation_object_schemas: GetReservationObjectSchemasUseCase
+    get_user_reservation_objects: GetUserReservationObjectsUseCase
 
 
 def build_mcp_use_cases(
@@ -80,6 +87,7 @@ def build_mcp_use_cases(
     contract_repo = SqlContractRepository(session)
     booking_repo = SqlBookingRepository(session)
     outbox_repo = SqlOutboxRepository(session)
+    res_obj_repo = SqlReservationObjectRepository(session)
 
     # Adaptadores Redis & Seguridad
     avail_cache = RedisAvailabilityCache(redis)
@@ -114,6 +122,8 @@ def build_mcp_use_cases(
         cancel_booking=CancelBookingUseCase(booking_repo, outbox_repo, catalog_repo=svc_repo),
         resolve_booking_notice=ResolveBookingNoticeUseCase(booking_repo, outbox_repo, catalog_repo=svc_repo),
         get_seat_map=GetSeatMapUseCase(seat_cache, bus_client, token_codec, catalog_repo=svc_repo),
+        get_reservation_object_schemas=GetReservationObjectSchemasUseCase(res_obj_repo),
+        get_user_reservation_objects=GetUserReservationObjectsUseCase(res_obj_repo),
     )
 
 

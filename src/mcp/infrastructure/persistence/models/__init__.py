@@ -19,6 +19,10 @@ from src.mcp.infrastructure.persistence.models.contract_models import (
     ServicePriceRuleModel,
     ServicePricingPolicyModel,
 )
+from src.mcp.infrastructure.persistence.models.reservation_object_models import (
+    ReservationObjectModel,
+    ReservationObjectSchemaModel,
+)
 
 __all__ = [
     "EstablishmentModel",
@@ -36,4 +40,6 @@ __all__ = [
     "BookingStatusHistoryModel",
     "OutboxEventModel",
     "InboxEventModel",
+    "ReservationObjectSchemaModel",
+    "ReservationObjectModel",
 ]

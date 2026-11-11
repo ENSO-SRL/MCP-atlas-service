@@ -66,6 +66,8 @@ def mock_use_cases():
         cancel_booking=MagicMock(),
         resolve_booking_notice=MagicMock(),
         get_seat_map=MagicMock(),
+        get_reservation_object_schemas=MagicMock(),
+        get_user_reservation_objects=MagicMock(),
     )
 
 
@@ -107,10 +109,12 @@ async def test_server_registers_all_10_tools(server):
         "cancel_booking",
         "resolve_booking_notice",
         "get_seat_map",
+        "get_reservation_object_schemas",
+        "get_user_reservation_objects",
     }
 
     assert tool_names == expected_tools
-    assert len(tools) == 12
+    assert len(tools) == 14
 
 
 @pytest.mark.asyncio
@@ -129,6 +133,8 @@ async def test_server_tool_annotations_match_spec(server):
         "get_booking_status",
         "list_my_bookings",
         "get_seat_map",
+        "get_reservation_object_schemas",
+        "get_user_reservation_objects",
     ]
     for name in read_only_tools:
         ann = tools[name].annotations
@@ -570,6 +576,94 @@ async def test_get_seat_map_tool_execution(server, mock_use_cases):
     assert data["seats_remaining"] == 101
     assert data["recommended_seats"] == ["F6", "F7"]
     assert "F" in data["rows"]
+
+
+@pytest.mark.asyncio
+async def test_get_reservation_object_schemas_tool_execution(server, mock_use_cases):
+    """Prueba que get_reservation_object_schemas ejecute correctamente y devuelva los schemas del servicio."""
+    from src.mcp.application.dto.reservation_object_dtos import (
+        ReservationObjectSchemaDTO,
+        ReservationObjectSchemasResponseDTO,
+        SchemaFieldDTO,
+    )
+
+    mock_use_cases.get_reservation_object_schemas.execute = AsyncMock(
+        return_value=ReservationObjectSchemasResponseDTO(
+            service_id=99,
+            schemas=[
+                ReservationObjectSchemaDTO(
+                    schema_id=1,
+                    schema_header="vvautos_taller:vehiculo",
+                    service_id=99,
+                    section_name="Tus vehículos",
+                    schema_fields=[
+                        SchemaFieldDTO(
+                            field_name="vehicle_model",
+                            data_type="string",
+                            is_required=True,
+                            high_variance_flag=False,
+                            description="Modelo del vehículo",
+                        ),
+                        SchemaFieldDTO(
+                            field_name="vehicle_mileage",
+                            data_type="string",
+                            is_required=True,
+                            high_variance_flag=True,
+                            description="Kilometraje actual",
+                        ),
+                    ],
+                )
+            ],
+        )
+    )
+
+    result = await server.call_tool("get_reservation_object_schemas", {"service_id": 99})
+    data = json.loads(result.content[0].text)
+
+    assert data["service_id"] == 99
+    assert len(data["schemas"]) == 1
+    assert data["schemas"][0]["schema_header"] == "vvautos_taller:vehiculo"
+    assert data["schemas"][0]["section_name"] == "Tus vehículos"
+    assert data["schemas"][0]["schema_fields"][1]["high_variance_flag"] is True
+
+
+@pytest.mark.asyncio
+async def test_get_user_reservation_objects_tool_execution(server, mock_use_cases):
+    """Prueba que get_user_reservation_objects ejecute correctamente y devuelva los objetos del usuario."""
+    from src.mcp.application.dto.reservation_object_dtos import (
+        ReservationObjectDTO,
+        UserReservationObjectsResponseDTO,
+    )
+
+    mock_use_cases.get_user_reservation_objects.execute = AsyncMock(
+        return_value=UserReservationObjectsResponseDTO(
+            schema_header="vvautos_taller:vehiculo",
+            section_name="Tus vehículos",
+            user_phone="+18094251911",
+            objects=[
+                ReservationObjectDTO(
+                    id=19,
+                    schema_id=1,
+                    object_alias="Mi Tacoma 2024",
+                    payload={"vehicle_model": "Toyota Tacoma 2024", "vehicle_mileage": "15000"},
+                    created_at="2026-09-02T16:26:23Z",
+                )
+            ],
+        )
+    )
+
+    result = await server.call_tool(
+        "get_user_reservation_objects",
+        {"schema_header": "vvautos_taller:vehiculo"},
+    )
+    data = json.loads(result.content[0].text)
+
+    assert data["schema_header"] == "vvautos_taller:vehiculo"
+    assert data["section_name"] == "Tus vehículos"
+    assert len(data["objects"]) == 1
+    assert data["objects"][0]["id"] == 19
+    assert data["objects"][0]["object_alias"] == "Mi Tacoma 2024"
+
 
 
 

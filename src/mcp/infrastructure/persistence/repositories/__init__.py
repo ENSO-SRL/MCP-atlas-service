@@ -13,6 +13,9 @@ from src.mcp.infrastructure.persistence.repositories.sql_establishment_repositor
 from src.mcp.infrastructure.persistence.repositories.sql_outbox_repository import (
     SqlOutboxRepository,
 )
+from src.mcp.infrastructure.persistence.repositories.sql_reservation_object_repository import (
+    SqlReservationObjectRepository,
+)
 
 __all__ = [
     "SqlEstablishmentRepository",
@@ -20,4 +23,5 @@ __all__ = [
     "SqlContractRepository",
     "SqlBookingRepository",
     "SqlOutboxRepository",
+    "SqlReservationObjectRepository",
 ]

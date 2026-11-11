@@ -11,8 +11,14 @@ from src.mcp.application.use_cases.get_booking_status import GetBookingStatusUse
 from src.mcp.application.use_cases.get_business_details import GetBusinessDetailsUseCase
 from src.mcp.application.use_cases.get_dimension_options import GetDimensionOptionsUseCase
 from src.mcp.application.use_cases.get_operation_result import GetOperationResultUseCase
+from src.mcp.application.use_cases.get_reservation_object_schemas import (
+    GetReservationObjectSchemasUseCase,
+)
 from src.mcp.application.use_cases.get_seat_map import GetSeatMapUseCase
 from src.mcp.application.use_cases.get_service_contract import GetServiceContractUseCase
+from src.mcp.application.use_cases.get_user_reservation_objects import (
+    GetUserReservationObjectsUseCase,
+)
 from src.mcp.application.use_cases.list_my_bookings import ListMyBookingsUseCase
 from src.mcp.application.use_cases.operation_helpers import (
     GENERIC_INTERNAL_ERROR_MESSAGE,
@@ -29,6 +35,8 @@ __all__ = [
     "CheckAvailabilityUseCase",
     "GetOperationResultUseCase",
     "GetSeatMapUseCase",
+    "GetReservationObjectSchemasUseCase",
+    "GetUserReservationObjectsUseCase",
     "process_raw_slots",
     "CreateBookingRequestUseCase",
     "compute_request_fingerprint",

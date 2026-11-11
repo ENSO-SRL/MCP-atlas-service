@@ -7,6 +7,10 @@ from uuid import UUID
 from src.mcp.domain.entities.booking_request import BookingRequest
 from src.mcp.domain.entities.catalog_entities import CatalogService, Establishment
 from src.mcp.domain.entities.contract_entities import ServiceContractVersion
+from src.mcp.domain.entities.reservation_object_entities import (
+    ReservationObject,
+    ReservationObjectSchema,
+)
 from src.mcp.domain.entities.service_price_rule import ServicePriceRule
 from src.mcp.domain.enums.mcp_enums import BookingStatus
 
@@ -175,3 +179,30 @@ class IRedisBusClient(ABC):
         self, cache_key: str, data: dict[str, Any], ttl_seconds: int
     ) -> None:
         pass
+
+
+class IReservationObjectRepository(ABC):
+    """Puerto de persistencia para esquemas y objetos de reserva (Reservation Objects)."""
+
+    @abstractmethod
+    async def get_schemas_by_service_id(self, service_id: int) -> list[ReservationObjectSchema]:
+        """Obtiene los esquemas de objetos asociados a un servicio."""
+        pass
+
+    @abstractmethod
+    async def get_schema_by_header(self, schema_header: str) -> Optional[ReservationObjectSchema]:
+        """Obtiene un esquema de objeto por su schema_header único."""
+        pass
+
+    @abstractmethod
+    async def get_objects_by_schema_and_phone(
+        self, schema_id: int, user_phone: str
+    ) -> list[ReservationObject]:
+        """Obtiene los objetos activos guardados para un usuario y esquema."""
+        pass
+
+    @abstractmethod
+    async def get_user_phone_by_uuid(self, user_uuid: UUID) -> Optional[str]:
+        """Recupera el número de teléfono del usuario desde la tabla users por su UUID."""
+        pass
+
