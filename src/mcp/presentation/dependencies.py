@@ -15,6 +15,7 @@ from src.mcp.application.use_cases import (
     GetBusinessDetailsUseCase,
     GetDimensionOptionsUseCase,
     GetOperationResultUseCase,
+    GetSeatMapUseCase,
     GetServiceContractUseCase,
     ListMyBookingsUseCase,
     ResolveBookingNoticeUseCase,
@@ -39,6 +40,7 @@ from src.mcp.infrastructure.redis.redis_bus_client import RedisBusClient
 from src.mcp.infrastructure.redis.redis_cache_manager import (
     RedisAvailabilityCache,
     RedisDimensionOptionsCache,
+    RedisSeatMapCache,
 )
 from src.mcp.infrastructure.redis.redis_hold_manager import RedisHoldManager
 from src.mcp.infrastructure.security.slot_token_codec import SlotTokenCodec
@@ -61,6 +63,7 @@ class MCPUseCases:
     list_my_bookings: ListMyBookingsUseCase
     cancel_booking: CancelBookingUseCase
     resolve_booking_notice: ResolveBookingNoticeUseCase
+    get_seat_map: GetSeatMapUseCase
 
 
 def build_mcp_use_cases(
@@ -81,6 +84,7 @@ def build_mcp_use_cases(
     # Adaptadores Redis & Seguridad
     avail_cache = RedisAvailabilityCache(redis)
     dim_cache = RedisDimensionOptionsCache(redis)
+    seat_cache = RedisSeatMapCache(redis)
     hold_manager = RedisHoldManager(redis)
     bus_client = RedisBusClient(redis)
     token_codec = SlotTokenCodec(secret=settings.MCP_TOKEN_SECRET)
@@ -100,6 +104,7 @@ def build_mcp_use_cases(
             token_codec=token_codec,
             avail_cache=avail_cache,
             dim_cache=dim_cache,
+            seat_cache=seat_cache,
         ),
         create_booking_request=CreateBookingRequestUseCase(
             booking_repo, contract_repo, hold_manager, outbox_repo, token_codec, catalog_repo=svc_repo
@@ -108,6 +113,7 @@ def build_mcp_use_cases(
         list_my_bookings=ListMyBookingsUseCase(booking_repo, svc_repo),
         cancel_booking=CancelBookingUseCase(booking_repo, outbox_repo, catalog_repo=svc_repo),
         resolve_booking_notice=ResolveBookingNoticeUseCase(booking_repo, outbox_repo, catalog_repo=svc_repo),
+        get_seat_map=GetSeatMapUseCase(seat_cache, bus_client, token_codec, catalog_repo=svc_repo),
     )
 
 

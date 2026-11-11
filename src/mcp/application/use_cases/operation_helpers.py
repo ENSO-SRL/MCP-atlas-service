@@ -23,7 +23,7 @@ def resolve_operation_error(
     Retorna una tupla: (mensaje_para_usuario, result_type_normalizado).
     """
     result_type = str(payload.get("result_type") or "").strip()
-    detail = payload.get("detail") or payload.get("error")
+    detail = payload.get("detail") or payload.get("error") or payload.get("error_message")
 
     if result_type == "internal_error":
         logger.error(

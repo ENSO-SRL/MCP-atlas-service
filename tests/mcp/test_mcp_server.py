@@ -65,6 +65,7 @@ def mock_use_cases():
         list_my_bookings=MagicMock(),
         cancel_booking=MagicMock(),
         resolve_booking_notice=MagicMock(),
+        get_seat_map=MagicMock(),
     )
 
 
@@ -105,10 +106,11 @@ async def test_server_registers_all_10_tools(server):
         "list_my_bookings",
         "cancel_booking",
         "resolve_booking_notice",
+        "get_seat_map",
     }
 
     assert tool_names == expected_tools
-    assert len(tools) == 11
+    assert len(tools) == 12
 
 
 @pytest.mark.asyncio
@@ -126,6 +128,7 @@ async def test_server_tool_annotations_match_spec(server):
         "get_operation_result",
         "get_booking_status",
         "list_my_bookings",
+        "get_seat_map",
     ]
     for name in read_only_tools:
         ann = tools[name].annotations
@@ -527,6 +530,47 @@ async def test_resolve_booking_notice_tool_execution(server, mock_use_cases):
     assert data["status"] == "accepted"
     assert data["decision"] == "accept"
     assert "confirmados" in data["message"]
+
+
+@pytest.mark.asyncio
+async def test_get_seat_map_tool_execution(server, mock_use_cases):
+    """Prueba que get_seat_map ejecute correctamente y devuelva el plano estructurado."""
+    from src.mcp.application.dto.seat_map_dtos import SeatMapResponseDTO
+
+    mock_use_cases.get_seat_map.execute = AsyncMock(
+        return_value=SeatMapResponseDTO(
+            status="completed",
+            service_id=90,
+            showing_id="1093912",
+            screen_name="Sala 4",
+            seats_remaining=101,
+            seat_mode_options=["mejor", "seleccion"],
+            recommended_seats=["F6", "F7"],
+            available_seats=["F6", "F7", "F8"],
+            rows={
+                "F": [
+                    {"label": "F1", "status": "occupied"},
+                    {"label": "F6", "status": "available", "recommended": True},
+                ]
+            },
+            message="Plano de asientos recuperado exitosamente.",
+        )
+    )
+
+    result = await server.call_tool(
+        "get_seat_map",
+        {"service_id": 90, "showing_id": "1093912"},
+    )
+    data = json.loads(result.content[0].text)
+
+    assert data["status"] == "completed"
+    assert data["service_id"] == 90
+    assert data["showing_id"] == "1093912"
+    assert data["screen_name"] == "Sala 4"
+    assert data["seats_remaining"] == 101
+    assert data["recommended_seats"] == ["F6", "F7"]
+    assert "F" in data["rows"]
+
 
 
 # =========================================================================

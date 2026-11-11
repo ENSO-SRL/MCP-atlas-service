@@ -76,6 +76,34 @@ class RedisBusClient(IRedisBusClient):
         )
         await self._redis.rpush("queue:dim:requests", json.dumps(envelope, ensure_ascii=False))
 
+    async def publish_seat_map_request(
+        self,
+        operation_id: str,
+        payload: dict[str, Any],
+        queue_name: Optional[str] = None,
+    ) -> None:
+        """
+        Publica una solicitud de mapa de butacas/asientos en 'queue:seatmap:requests'
+        e inicializa el registro op:{operation_id} con status='processing'.
+        """
+        envelope = {
+            "operation_id": operation_id,
+            "type": "seat_map_request",
+            "payload": payload,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        await self.set_operation_result(
+            operation_id,
+            {
+                "status": "processing",
+                "operation_id": operation_id,
+                "created_at": envelope["created_at"],
+            },
+            ttl_seconds=self._settings.REDIS_OPERATION_TTL,
+        )
+        target_queue = queue_name or "queue:seatmap:requests"
+        await self._redis.rpush(target_queue, json.dumps(envelope, ensure_ascii=False))
+
     async def wait_for_response(
         self, response_key: str, timeout_seconds: float
     ) -> Optional[dict[str, Any]]:

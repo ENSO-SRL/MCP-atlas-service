@@ -18,6 +18,7 @@ from src.mcp.domain.ports.mcp_ports import (
 from src.mcp.infrastructure.redis.redis_cache_manager import (
     RedisAvailabilityCache,
     RedisDimensionOptionsCache,
+    RedisSeatMapCache,
 )
 from src.mcp.infrastructure.security.slot_token_codec import SlotTokenCodec
 
@@ -41,6 +42,7 @@ class GetOperationResultUseCase:
         token_codec: SlotTokenCodec,
         avail_cache: RedisAvailabilityCache,
         dim_cache: RedisDimensionOptionsCache,
+        seat_cache: Optional[RedisSeatMapCache] = None,
     ):
         self._bus_client = bus_client
         self._contract_repo = contract_repo
@@ -48,6 +50,7 @@ class GetOperationResultUseCase:
         self._token_codec = token_codec
         self._avail_cache = avail_cache
         self._dim_cache = dim_cache
+        self._seat_cache = seat_cache
 
     async def execute(self, query: GetOperationResultQueryDTO) -> OperationResultResponseDTO:
         # 1. Consultar resultado con Lazy-Sync
@@ -167,6 +170,20 @@ class GetOperationResultUseCase:
                 operation_id=query.operation_id,
                 result_type="availability",
                 slots=slots,
+            )
+
+        if "rows" in raw_result or "available_seats" in raw_result or raw_result.get("result_type") == "seat_map":
+            # Resultado de plano de asientos
+            service_id = int(raw_result.get("service_id", 0))
+            showing_id = str(raw_result.get("showing_id", ""))
+            if self._seat_cache is not None and service_id and showing_id:
+                await self._seat_cache.set(service_id, showing_id, raw_result, ttl_seconds=90)
+
+            return OperationResultResponseDTO(
+                status="completed",
+                operation_id=query.operation_id,
+                result_type="seat_map",
+                seat_map=raw_result,
             )
 
         # Resultado completado sin formato reconocido

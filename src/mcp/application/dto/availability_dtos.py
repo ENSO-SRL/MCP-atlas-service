@@ -72,11 +72,12 @@ class GetOperationResultQueryDTO:
 
 @dataclass
 class OperationResultResponseDTO:
-    """Resultado de una operación diferida (disponibilidad o dimensión)."""
+    """Resultado de una operación diferida (disponibilidad, dimensión o mapa de asientos)."""
     status: str  # "completed" | "processing" | "failed"
     operation_id: str
-    result_type: str = "availability"  # "availability" | "dimension_options"
+    result_type: str = "availability"  # "availability" | "dimension_options" | "seat_map"
     slots: list[AvailableSlotDTO] = field(default_factory=list)
     dimension_options: list[DimensionOptionDTO] = field(default_factory=list)
+    seat_map: Optional[dict[str, Any]] = None
     error_message: Optional[str] = None
     retry_after_seconds: Optional[int] = None

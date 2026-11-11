@@ -132,3 +132,43 @@ class RedisDimensionOptionsCache:
     async def delete(self, service_id: int, dimension_key: str, context: dict[str, Any]) -> None:
         key = self.build_key(service_id, dimension_key, context)
         await self._redis.delete(key)
+
+
+class RedisSeatMapCache:
+    """
+    Caché de plano de asientos y butacas disponibles para funciones de cine o espectáculos.
+    Clave Redis: mcp:seat:cache:{service_id}:{showing_id}
+    TTL por defecto: 90 segundos.
+    """
+
+    def __init__(self, redis_client: Optional[Redis] = None, default_ttl: int = 90):
+        self._redis = redis_client or get_redis_client()
+        self._default_ttl = default_ttl
+
+    @staticmethod
+    def build_key(service_id: int, showing_id: str) -> str:
+        return f"mcp:seat:cache:{service_id}:{showing_id}"
+
+    async def get(self, service_id: int, showing_id: str) -> Optional[dict[str, Any]]:
+        key = self.build_key(service_id, showing_id)
+        raw = await self._redis.get(key)
+        if raw is None:
+            return None
+        return json.loads(raw)
+
+    async def set(
+        self,
+        service_id: int,
+        showing_id: str,
+        data: dict[str, Any],
+        ttl_seconds: Optional[int] = None,
+    ) -> None:
+        key = self.build_key(service_id, showing_id)
+        ttl = ttl_seconds if ttl_seconds is not None else self._default_ttl
+        serialized = json.dumps(data, ensure_ascii=False)
+        await self._redis.set(key, serialized, ex=ttl)
+
+    async def delete(self, service_id: int, showing_id: str) -> None:
+        key = self.build_key(service_id, showing_id)
+        await self._redis.delete(key)
+

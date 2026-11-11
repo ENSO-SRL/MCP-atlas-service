@@ -10,6 +10,7 @@ from src.mcp.application.dto.availability_dtos import (
     CheckAvailabilityQueryDTO,
     GetOperationResultQueryDTO,
 )
+from src.mcp.application.dto.seat_map_dtos import GetSeatMapQueryDTO
 from src.mcp.domain.exceptions.mcp_exceptions import ContractValidationException
 from src.mcp.presentation.auth_context import extract_user_context
 from src.mcp.presentation.dependencies import get_mcp_use_cases
@@ -166,6 +167,54 @@ def register_availability_tools(server: MCPServer) -> None:
             ]
             if res.slots
             else [],
+            "seat_map": res.seat_map,
             "error_message": res.error_message,
             "retry_after_seconds": res.retry_after_seconds,
         }
+
+    @server.tool(
+        name="get_seat_map",
+        title="Consultar Mapa de Asientos y Butacas",
+        description=(
+            "Consulta el plano de sala y las butacas disponibles para una función de cine, espectáculo o evento en Atlas. "
+            "Permite ver butacas ocupadas, disponibles, recomendadas y su distribución por filas. "
+            "Requiere 'service_id' y al menos 'showing_id' (obtenido de 'offer_ref' en check_availability) o 'slot_token'."
+        ),
+        annotations=ToolAnnotations(read_only_hint=True),
+    )
+    @handle_mcp_errors
+    async def get_seat_map(
+        service_id: int,
+        showing_id: Optional[str] = None,
+        slot_token: Optional[str] = None,
+        ctx: Optional[Context] = None,
+    ) -> dict[str, Any]:
+        user = extract_user_context(ctx, required_scope="bookings:read")
+
+        dto_query = GetSeatMapQueryDTO(
+            service_id=service_id,
+            showing_id=showing_id,
+            slot_token=slot_token,
+            user_uuid=user.user_uuid,
+            user_phone=user.phone_number,
+        )
+
+        async with get_mcp_use_cases() as uc:
+            res = await uc.get_seat_map.execute(dto_query)
+
+        return {
+            "status": res.status,
+            "service_id": res.service_id,
+            "showing_id": res.showing_id,
+            "screen_name": res.screen_name,
+            "seats_remaining": res.seats_remaining,
+            "seat_mode_options": res.seat_mode_options,
+            "recommended_seats": res.recommended_seats,
+            "available_seats": res.available_seats,
+            "rows": res.rows,
+            "operation_id": res.operation_id,
+            "expires_in_seconds": res.expires_in_seconds,
+            "error_message": res.error_message,
+            "message": res.message,
+        }
+
