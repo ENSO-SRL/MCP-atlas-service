@@ -11,6 +11,7 @@ from src.oauth.application.use_cases.generate_authorization_code import (
 )
 from src.oauth.application.use_cases.get_user_info import GetUserInfoUseCase
 from src.oauth.application.use_cases.refresh_token import RefreshTokenUseCase
+from src.oauth.application.use_cases.register_client import RegisterClientUseCase
 from src.oauth.application.use_cases.revoke_token import RevokeTokenUseCase
 from src.oauth.domain.ports.i_oauth_client_repository import IOAuthClientRepository
 from src.oauth.domain.ports.i_oauth_token_repository import IOAuthTokenRepository
@@ -119,3 +120,9 @@ def get_user_info_use_case(
     user_repo: IUserRepository = Depends(get_user_repository),
 ) -> GetUserInfoUseCase:
     return GetUserInfoUseCase(user_repo=user_repo)
+
+
+def get_register_client_use_case(
+    client_repo: IOAuthClientRepository = Depends(get_oauth_client_repository),
+) -> RegisterClientUseCase:
+    return RegisterClientUseCase(client_repo=client_repo)

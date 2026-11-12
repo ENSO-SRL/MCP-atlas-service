@@ -7,6 +7,7 @@ from src.oauth.application.use_cases.generate_authorization_code import (
 )
 from src.oauth.application.use_cases.get_user_info import GetUserInfoUseCase
 from src.oauth.application.use_cases.refresh_token import RefreshTokenUseCase
+from src.oauth.application.use_cases.register_client import RegisterClientUseCase
 from src.oauth.application.use_cases.revoke_token import RevokeTokenUseCase
 
 __all__ = [
@@ -16,5 +17,6 @@ __all__ = [
     "RefreshTokenUseCase",
     "RevokeTokenUseCase",
     "GetUserInfoUseCase",
+    "RegisterClientUseCase",
 ]
 

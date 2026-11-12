@@ -117,3 +117,41 @@ class UserInfoDTO:
             data["phone_number"] = self.phone_number
         return data
 
+
+@dataclass(frozen=True)
+class ClientRegistrationRequestDTO:
+    """Solicitud de Dynamic Client Registration (RFC 7591) enviada por clientes MCP como Claude."""
+    redirect_uris: list[str]
+    client_name: Optional[str] = None
+    token_endpoint_auth_method: Optional[str] = "none"
+    grant_types: Optional[list[str]] = None
+    response_types: Optional[list[str]] = None
+    scope: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class ClientRegistrationResponseDTO:
+    """Respuesta estándar de Dynamic Client Registration (RFC 7591)."""
+    client_id: str
+    client_name: str
+    redirect_uris: list[str]
+    token_endpoint_auth_method: str
+    grant_types: list[str]
+    response_types: list[str]
+    client_id_issued_at: int
+    client_secret: Optional[str] = None
+
+    def to_dict(self) -> dict[str, object]:
+        data: dict[str, object] = {
+            "client_id": self.client_id,
+            "client_name": self.client_name,
+            "redirect_uris": self.redirect_uris,
+            "token_endpoint_auth_method": self.token_endpoint_auth_method,
+            "grant_types": self.grant_types,
+            "response_types": self.response_types,
+            "client_id_issued_at": self.client_id_issued_at,
+        }
+        if self.client_secret:
+            data["client_secret"] = self.client_secret
+        return data
+

@@ -130,6 +130,7 @@ def create_unified_app() -> FastAPI:
             "endpoints": {
                 "oauth_discovery": "/.well-known/oauth-authorization-server",
                 "oauth_protected_resource": "/.well-known/oauth-protected-resource",
+                "oauth_register": "/oauth/register",
                 "oauth_authorize": "/oauth/authorize",
                 "oauth_token": "/oauth/token",
                 "mcp_sse": "/sse",

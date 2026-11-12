@@ -3,9 +3,10 @@ from __future__ import annotations
 import base64
 import logging
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Optional
 from uuid import UUID
 
+from pydantic import BaseModel, ConfigDict
 from fastapi import APIRouter, Depends, FastAPI, Form, Header, HTTPException, Query, Request, Response, status
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -15,6 +16,7 @@ logger = logging.getLogger("oauth.server")
 
 from src.oauth.application.dto.oauth_dtos import (
     AuthorizeRequestDTO,
+    ClientRegistrationRequestDTO,
     RevokeTokenRequestDTO,
     TokenExchangeRequestDTO,
     TokenRefreshRequestDTO,
@@ -27,6 +29,7 @@ from src.oauth.application.use_cases.generate_authorization_code import (
 )
 from src.oauth.application.use_cases.get_user_info import GetUserInfoUseCase
 from src.oauth.application.use_cases.refresh_token import RefreshTokenUseCase
+from src.oauth.application.use_cases.register_client import RegisterClientUseCase
 from src.oauth.application.use_cases.revoke_token import RevokeTokenUseCase
 from src.oauth.domain.exceptions.auth_exceptions import (
     AuthDomainException,
@@ -46,6 +49,7 @@ from src.oauth.presentation.dependencies import (
     get_generate_authorization_code_use_case,
     get_oauth_client_repository,
     get_refresh_token_use_case,
+    get_register_client_use_case,
     get_revoke_token_use_case,
     get_token_issuer,
     get_user_info_use_case,
@@ -122,6 +126,7 @@ async def oauth_authorization_server_metadata(request: Request):
         "issuer": issuer,
         "authorization_endpoint": f"{issuer}/oauth/authorize",
         "token_endpoint": f"{issuer}/oauth/token",
+        "registration_endpoint": f"{issuer}/oauth/register",
         "revocation_endpoint": f"{issuer}/oauth/revoke",
         "userinfo_endpoint": f"{issuer}/oauth/userinfo",
         "response_types_supported": ["code"],
@@ -130,6 +135,60 @@ async def oauth_authorization_server_metadata(request: Request):
         "code_challenge_methods_supported": ["S256"],
         "scopes_supported": ["bookings:read", "bookings:write", "profile"],
     }
+
+
+# =========================================================================
+# RFC 7591 Dynamic Client Registration Endpoint: POST /oauth/register
+# =========================================================================
+class ClientRegistrationRequestBody(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    redirect_uris: list[str]
+    client_name: Optional[str] = None
+    token_endpoint_auth_method: Optional[str] = "none"
+    grant_types: Optional[list[str]] = None
+    response_types: Optional[list[str]] = None
+    scope: Optional[str] = None
+
+
+ClientRegistrationRequestBody.model_rebuild()
+
+
+@oauth_router.post(
+    "/oauth/register",
+    status_code=status.HTTP_201_CREATED,
+    tags=["OAuth 2.0 Dynamic Client Registration (RFC 7591)"],
+)
+async def register_client_endpoint(
+    body: ClientRegistrationRequestBody,
+    register_client_use_case: RegisterClientUseCase = Depends(get_register_client_use_case),
+):
+    """
+    Endpoint de Registro Dinámico de Clientes OAuth 2.0 (RFC 7591).
+    Permite a Claude Desktop y mcp-remote registrarse automáticamente y obtener un client_id válido.
+    """
+    try:
+        dto = ClientRegistrationRequestDTO(
+            redirect_uris=body.redirect_uris,
+            client_name=body.client_name,
+            token_endpoint_auth_method=body.token_endpoint_auth_method,
+            grant_types=body.grant_types,
+            response_types=body.response_types,
+            scope=body.scope,
+        )
+        result = await register_client_use_case.execute(dto)
+        return JSONResponse(status_code=status.HTTP_201_CREATED, content=result.to_dict())
+    except InvalidRedirectUriException as err:
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"error": "invalid_redirect_uri", "error_description": str(err)},
+        )
+    except Exception as err:
+        logger.exception("Error en /oauth/register: %s", err)
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"error": "invalid_client_metadata", "error_description": str(err)},
+        )
 
 
 # =========================================================================

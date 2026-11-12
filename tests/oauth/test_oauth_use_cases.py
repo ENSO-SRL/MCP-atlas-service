@@ -500,3 +500,37 @@ def test_oauth_client_loopback_redirect_uris_rfc8252():
     assert client.is_redirect_uri_allowed("https://claude.ai:8443/api/oauth/callback") is False
     assert client.is_redirect_uri_allowed("http://evil.com/callback") is False
 
+
+@pytest.mark.asyncio
+async def test_register_client_use_case_rfc7591():
+    client_repo = AsyncMock()
+    # Simular que save retorna el mismo cliente guardado
+    client_repo.save.side_effect = lambda c: c
+
+    from src.oauth.application.dto.oauth_dtos import ClientRegistrationRequestDTO
+    from src.oauth.application.use_cases.register_client import RegisterClientUseCase
+
+    use_case = RegisterClientUseCase(client_repo)
+    dto = ClientRegistrationRequestDTO(
+        client_name="Claude Desktop MCP Client",
+        redirect_uris=["http://localhost:22913/callback", "http://127.0.0.1:22913/callback"],
+        token_endpoint_auth_method="none",
+    )
+
+    res = await use_case.execute(dto)
+    assert res.client_id.startswith("mcp-client-")
+    assert res.client_name == "Claude Desktop MCP Client"
+    assert res.token_endpoint_auth_method == "none"
+    assert "http://localhost:22913/callback" in res.redirect_uris
+    assert "authorization_code" in res.grant_types
+    assert "code" in res.response_types
+    assert res.client_id_issued_at > 0
+    client_repo.save.assert_awaited_once()
+
+    # Validar que si no se proveen redirect_uris válidas falle
+    with pytest.raises(InvalidRedirectUriException):
+        await use_case.execute(ClientRegistrationRequestDTO(redirect_uris=[]))
+
+    with pytest.raises(InvalidRedirectUriException):
+        await use_case.execute(ClientRegistrationRequestDTO(redirect_uris=["invalid-uri-no-scheme"]))
+

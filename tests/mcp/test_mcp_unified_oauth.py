@@ -38,6 +38,7 @@ async def test_unified_app_root_and_discovery():
         assert "http://testserver" in disc_data["issuer"]
         assert "/oauth/authorize" in disc_data["authorization_endpoint"]
         assert "/oauth/token" in disc_data["token_endpoint"]
+        assert "/oauth/register" in disc_data["registration_endpoint"]
         assert "S256" in disc_data["code_challenge_methods_supported"]
 
         # 3. Discovery Protected Resource RFC 9470 (usado por mcp-remote)
@@ -135,4 +136,37 @@ def test_extract_user_context_starlette_headers_support():
     assert user.email == "usuario.real@atlas.com"
     assert user.phone_number == "+18095551234"
     assert user.name == "Usuario Real"
+
+
+@pytest.mark.asyncio
+async def test_dynamic_client_registration_endpoint_rfc7591():
+    """Verifica el endpoint POST /oauth/register consumido por mcp-remote."""
+    from unittest.mock import AsyncMock
+    from src.oauth.presentation.dependencies import get_oauth_client_repository
+
+    app = create_unified_app()
+    mock_repo = AsyncMock()
+    mock_repo.save.side_effect = lambda c: c
+    app.dependency_overrides[get_oauth_client_repository] = lambda: mock_repo
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        payload = {
+            "client_name": "Claude Desktop MCP Client",
+            "redirect_uris": ["http://localhost:22913/callback"],
+            "token_endpoint_auth_method": "none",
+            "grant_types": ["authorization_code", "refresh_token"],
+            "response_types": ["code"],
+        }
+        res = await client.post("/oauth/register", json=payload)
+        assert res.status_code == 201
+        data = res.json()
+        assert data["client_id"].startswith("mcp-client-")
+        assert data["client_name"] == "Claude Desktop MCP Client"
+        assert data["redirect_uris"] == ["http://localhost:22913/callback"]
+        assert data["token_endpoint_auth_method"] == "none"
+        assert "authorization_code" in data["grant_types"]
+        assert data["client_id_issued_at"] > 0
+
+    app.dependency_overrides.clear()
 
