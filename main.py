@@ -42,12 +42,27 @@ async def _run_server() -> None:
 
 
 def main() -> None:
-    if len(sys.argv) > 1 and sys.argv[1].lower() in ("--oauth", "oauth", "--web", "web"):
+    # 1. Banderas explícitas de línea de comandos
+    if len(sys.argv) > 1:
+        cmd = sys.argv[1].lower()
+        if cmd in ("--stdio", "stdio"):
+            anyio.run(_run_server)
+            return
+        if cmd in ("--oauth", "oauth", "--web", "web", "--http", "http"):
+            import uvicorn
+            settings = get_settings()
+            uvicorn.run("src.main:app", host=settings.HOST, port=settings.PORT, reload=settings.DEBUG)
+            return
+
+    # 2. Sin banderas: detectar si se corre de forma interactiva o como subproceso stdio
+    # Si la entrada estándar no es un terminal interactivo (ej. Claude Desktop lanzándolo por tubería stdio):
+    if not sys.stdin.isatty():
+        anyio.run(_run_server)
+    else:
+        # En terminal interactiva (ej. 'python main.py'), levantar el servidor HTTP/OAuth/SSE unificado
         import uvicorn
         settings = get_settings()
-        uvicorn.run("src.oauth.presentation.app:app", host=settings.HOST, port=settings.PORT, reload=settings.DEBUG)
-    else:
-        anyio.run(_run_server)
+        uvicorn.run("src.main:app", host=settings.HOST, port=settings.PORT, reload=settings.DEBUG)
 
 
 if __name__ == "__main__":
