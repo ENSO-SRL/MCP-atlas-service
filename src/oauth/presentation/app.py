@@ -113,10 +113,11 @@ oauth_router = APIRouter(tags=["OAuth 2.0"])
 # =========================================================================
 @oauth_router.get("/.well-known/oauth-authorization-server")
 @oauth_router.get("/.well-known/openid-configuration")
-async def oauth_authorization_server_metadata():
+async def oauth_authorization_server_metadata(request: Request):
     """Retorna los metadatos de configuración del servidor de autorización OAuth 2.0."""
     settings = get_settings()
-    issuer = settings.OAUTH_ISSUER.rstrip("/")
+    base_url = str(request.base_url).rstrip("/")
+    issuer = base_url if settings.ENVIRONMENT != "production" else settings.OAUTH_ISSUER.rstrip("/")
     return {
         "issuer": issuer,
         "authorization_endpoint": f"{issuer}/oauth/authorize",
@@ -590,4 +591,4 @@ app = create_oauth_app()
 if __name__ == "__main__":
     import uvicorn
     settings = get_settings()
-    uvicorn.run("src.oauth.presentation.app:app", host=settings.HOST, port=settings.PORT, reload=settings.DEBUG)
+    uvicorn.run("src.main:app", host=settings.HOST, port=settings.PORT, reload=settings.DEBUG)

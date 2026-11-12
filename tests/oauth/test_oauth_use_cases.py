@@ -475,3 +475,28 @@ async def test_get_user_info():
     assert info.phone_number == "+18095554321"
     assert info.is_confirmed is True
 
+
+def test_oauth_client_loopback_redirect_uris_rfc8252():
+    client = OAuthClient(
+        id="claude-desktop",
+        redirect_uris=[
+            "http://127.0.0.1/callback",
+            "http://localhost/callback",
+            "https://claude.ai/api/oauth/callback",
+        ],
+    )
+    # Exact matches
+    assert client.is_redirect_uri_allowed("http://127.0.0.1/callback") is True
+    assert client.is_redirect_uri_allowed("http://localhost/callback") is True
+    assert client.is_redirect_uri_allowed("https://claude.ai/api/oauth/callback") is True
+
+    # RFC 8252 loopback with ephemeral ports
+    assert client.is_redirect_uri_allowed("http://localhost:18089/callback") is True
+    assert client.is_redirect_uri_allowed("http://127.0.0.1:49152/callback") is True
+    assert client.is_redirect_uri_allowed("http://localhost:54321/callback") is True
+
+    # Different path or non-loopback with different port must fail
+    assert client.is_redirect_uri_allowed("http://localhost:18089/wrong") is False
+    assert client.is_redirect_uri_allowed("https://claude.ai:8443/api/oauth/callback") is False
+    assert client.is_redirect_uri_allowed("http://evil.com/callback") is False
+

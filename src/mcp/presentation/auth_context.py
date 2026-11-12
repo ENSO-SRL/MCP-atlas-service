@@ -28,6 +28,7 @@ class AuthenticatedUser:
     user_uuid: UUID
     phone_number: Optional[str] = None
     email: Optional[str] = None
+    name: Optional[str] = None
     scopes: list[str] = field(default_factory=list)
 
     def __eq__(self, other: Any) -> bool:
@@ -67,8 +68,8 @@ def extract_user_context(
     if ctx is not None:
         try:
             raw_headers = ctx.headers
-            if raw_headers and isinstance(raw_headers, dict):
-                headers = {k.lower(): str(v) for k, v in raw_headers.items()}
+            if raw_headers and hasattr(raw_headers, "items"):
+                headers = {str(k).lower(): str(v) for k, v in raw_headers.items()}
         except (ValueError, AttributeError):
             headers = {}
 
@@ -100,12 +101,20 @@ def extract_user_context(
                 or claims.get("phone")
                 or claims.get("user_phone")
             )
+            if phone:
+                phone_str = str(phone)
+                if phone_str.lower().startswith("whatsapp:"):
+                    phone_str = phone_str[9:].strip()
+                phone = phone_str
+
             email = claims.get("email")
+            name = claims.get("name")
 
             return AuthenticatedUser(
                 user_uuid=UUID(sub),
                 phone_number=str(phone) if phone else None,
                 email=str(email) if email else None,
+                name=str(name) if name else None,
                 scopes=token_scopes,
             )
         except jwt.ExpiredSignatureError:
