@@ -40,6 +40,27 @@ async def test_unified_app_root_and_discovery():
         assert "/oauth/token" in disc_data["token_endpoint"]
         assert "S256" in disc_data["code_challenge_methods_supported"]
 
+        # 3. Discovery Protected Resource RFC 9470 (usado por mcp-remote)
+        res_res = await client.get("/.well-known/oauth-protected-resource")
+        assert res_res.status_code == 200
+        res_data = res_res.json()
+        assert "http://testserver" in res_data["resource"]
+        assert "http://testserver" in res_data["authorization_servers"][0]
+        assert "bookings:read" in res_data["scopes_supported"]
+
+        # 4. Desafío 401 en /sse cuando no se provee token Bearer
+        res_sse_unauth = await client.get("/sse")
+        assert res_sse_unauth.status_code == 401
+        assert "WWW-Authenticate" in res_sse_unauth.headers
+        assert "Bearer" in res_sse_unauth.headers["WWW-Authenticate"]
+        assert "resource_metadata=" in res_sse_unauth.headers["WWW-Authenticate"]
+        assert "bookings:read" in res_sse_unauth.headers["WWW-Authenticate"]
+
+        # 5. Desafío 401 en /messages/ cuando no se provee token Bearer
+        res_msg_unauth = await client.post("/messages/?session_id=123", json={})
+        assert res_msg_unauth.status_code == 401
+        assert "WWW-Authenticate" in res_msg_unauth.headers
+
 
 def test_extract_user_context_with_oauth_jwt():
     """Verifica la validación criptográfica del JWT y la extracción de la identidad real del usuario."""

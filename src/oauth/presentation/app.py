@@ -133,6 +133,23 @@ async def oauth_authorization_server_metadata(request: Request):
 
 
 # =========================================================================
+# RFC 9470 OAuth Protected Resource Metadata
+# =========================================================================
+@oauth_router.get("/.well-known/oauth-protected-resource")
+async def oauth_protected_resource_metadata(request: Request):
+    """Retorna los metadatos del recurso protegido según RFC 9470 para mcp-remote / Claude."""
+    settings = get_settings()
+    base_url = str(request.base_url).rstrip("/")
+    auth_server = base_url if settings.ENVIRONMENT != "production" else settings.OAUTH_ISSUER.rstrip("/")
+    return {
+        "resource": base_url,
+        "authorization_servers": [auth_server],
+        "scopes_supported": ["bookings:read", "bookings:write", "profile"],
+        "bearer_methods_supported": ["header"],
+    }
+
+
+# =========================================================================
 # RFC 6749 Authorization Endpoint: GET /oauth/authorize
 # =========================================================================
 @oauth_router.get("/oauth/authorize", response_class=HTMLResponse)

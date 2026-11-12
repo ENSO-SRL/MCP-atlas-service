@@ -135,8 +135,9 @@ def extract_user_context(
             raise AuthenticationRequiredException("Cabecera X-User-UUID inválida (no es un UUID válido).")
 
     # 5. Modo de desarrollo local (ej. Claude Desktop vía stdio sin OAuth)
+    # Solo aplica cuando no hay cabeceras HTTP presentes (ejecución pura por stdio/CLI)
     settings = get_settings()
-    if settings.DEV_MODE:
+    if settings.DEV_MODE and not headers:
         dev_uuid = settings.DEV_USER_UUID or UUID("00000000-0000-0000-0000-000000000001")
         return AuthenticatedUser(
             user_uuid=dev_uuid,
