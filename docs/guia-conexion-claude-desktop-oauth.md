@@ -14,19 +14,19 @@ sequenceDiagram
     participant CD as Claude Desktop
     participant MR as npx mcp-remote (Puente)
     participant Browser as Navegador Web
-    participant App as Servidor Atlas (:8000)
+    participant App as Servidor Atlas (:8005)
     participant DB as PostgreSQL (users)
 
     Note over Usuario,App: Paso 1: Inicio del Servidor Unificado
-    Usuario->>App: Inicia python src/main.py (:8000)
+    Usuario->>App: Inicia python src/main.py (:8005)
 
     Note over CD,MR: Paso 2: Conexión desde Claude Desktop
-    CD->>MR: Lanza subproceso stdio (mcp-remote http://localhost:8000/sse)
+    CD->>MR: Lanza subproceso stdio (mcp-remote http://localhost:8005/sse)
     MR->>App: GET /.well-known/oauth-authorization-server
     App-->>MR: Retorna metadatos OAuth (endpoints /oauth/authorize y /oauth/token)
 
     Note over MR,Browser: Paso 3: Login y Consentimiento
-    MR->>Browser: Abre http://localhost:8000/oauth/authorize
+    MR->>Browser: Abre http://localhost:8005/oauth/authorize
     Usuario->>Browser: Ingresa credenciales (email + contraseña)
     Browser->>App: POST /oauth/login
     App->>DB: Valida usuario en tabla users (bcrypt)
@@ -56,18 +56,18 @@ Abre una terminal en la raíz del proyecto (`atlas-mcp-conector`) con el entorno
 # Activar entorno virtual
 .venv\Scripts\Activate.ps1
 
-# Iniciar servidor unificado (FastAPI + OAuth + MCP SSE)
+# Iniciar servidor unificado (FastAPI + OAuth + MCP SSE en puerto 8005)
 python src/main.py
 ```
 
-El servidor quedará escuchando en `http://localhost:8000`.
+El servidor quedará escuchando en `http://localhost:8005` (se utiliza el puerto 8005 para evitar colisiones con procesos de Docker/WSL u otros servicios locales en el puerto 8000).
 
 ### Verificación rápida en tu navegador:
-* **Estado del conector:** Abre [http://localhost:8000/](http://localhost:8000/)  
+* **Estado del conector:** Abre [http://localhost:8005/](http://localhost:8005/)  
   &rarr; Debe responder `{"status": "online", "service": "Atlas MCP Connector & OAuth 2.0 Server", ...}`.
-* **Metadatos OAuth 2.0:** Abre [http://localhost:8000/.well-known/oauth-authorization-server](http://localhost:8000/.well-known/oauth-authorization-server)  
+* **Metadatos OAuth 2.0:** Abre [http://localhost:8005/.well-known/oauth-authorization-server](http://localhost:8005/.well-known/oauth-authorization-server)  
   &rarr; Debe responder con los endpoints de autorización y token locales.
-* **Pantalla de login:** Abre [http://localhost:8000/oauth/authorize?client_id=claude-desktop&redirect_uri=http://localhost:8000/callback&response_type=code](http://localhost:8000/oauth/authorize?client_id=claude-desktop&redirect_uri=http://localhost:8000/callback&response_type=code)  
+* **Pantalla de login:** Abre [http://localhost:8005/oauth/authorize?client_id=claude-desktop&redirect_uri=http://localhost:8005/callback&response_type=code](http://localhost:8005/oauth/authorize?client_id=claude-desktop&redirect_uri=http://localhost:8005/callback&response_type=code)  
   &rarr; Verás la pantalla oficial de inicio de sesión de Atlas con diseño responsivo.
 
 ---
@@ -90,7 +90,7 @@ Claude Desktop se comunica con el servidor local a través de **`mcp-remote`** (
       "args": [
         "-y",
         "mcp-remote",
-        "http://localhost:8000/sse",
+        "http://localhost:8005/sse",
         "--transport",
         "sse-only"
       ]
@@ -100,7 +100,7 @@ Claude Desktop se comunica con el servidor local a través de **`mcp-remote`** (
 ```
 
 > [!TIP]
-> * La URL del servidor (`http://localhost:8000/sse`) **debe ser el primer argumento posicional** después de `mcp-remote`.
+> * La URL del servidor (`http://localhost:8005/sse`) **debe ser el primer argumento posicional** después de `mcp-remote`.
 > * El parámetro `--transport sse-only` le indica a `mcp-remote` que se conecte directamente por Server-Sent Events (SSE) sin intentar transmisiones HTTP streamable intermedias.
 > * Requiere tener **Node.js** instalado en Windows (para ejecutar `npx`). Si ya tenías otros servidores en `claude_desktop_config.json`, añade `"atlas"` dentro de `"mcpServers"`.
 
@@ -144,7 +144,7 @@ Prueba con instrucciones en lenguaje natural:
 Si deseas inspeccionar el tráfico JSON-RPC o probar las herramientas en el navegador sin abrir Claude Desktop:
 
 ```powershell
-npx @modelcontextprotocol/inspector http://localhost:8000/sse
+npx @modelcontextprotocol/inspector http://localhost:8005/sse
 ```
 
 Esto abrirá la consola de desarrollo interactiva donde puedes probar cada tool de forma aislada.

@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = Field(default="development")
     DEBUG: bool = Field(default=True)
     HOST: str = Field(default="0.0.0.0")
-    PORT: int = Field(default=8000)
+    PORT: int = Field(default=8005)
 
     # Modo de desarrollo y pruebas locales (Claude Desktop por stdio sin OAuth)
     DEV_MODE: bool = Field(
