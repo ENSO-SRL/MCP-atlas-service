@@ -641,7 +641,7 @@ async def logout(response: Response, redirect_to: str = "/"):
 # =========================================================================
 # FastAPI Application Factory
 # =========================================================================
-def create_oauth_app() -> FastAPI:
+def create_oauth_app(lifespan: Optional[Any] = None) -> FastAPI:
     """Crea y configura la aplicación FastAPI para el servidor OAuth 2.0."""
     settings = get_settings()
     app = FastAPI(
@@ -650,6 +650,7 @@ def create_oauth_app() -> FastAPI:
         version="1.0.0",
         docs_url="/docs",
         redoc_url=None,
+        lifespan=lifespan,
     )
 
     # Montar archivos estáticos para la UI (CSS, imágenes, SVGs)

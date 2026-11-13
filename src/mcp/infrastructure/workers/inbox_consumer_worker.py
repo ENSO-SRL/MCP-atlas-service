@@ -15,9 +15,20 @@ from src.mcp.infrastructure.persistence.repositories.sql_booking_repository impo
 )
 from src.mcp.infrastructure.redis.redis_hold_manager import RedisHoldManager
 from src.shared.database.session import get_session_factory
+import sys
 from src.shared.redis.client import get_redis_client
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("mcp.inbox_consumer")
+logger.setLevel(logging.INFO)
+if not logger.handlers:
+    _console_handler = logging.StreamHandler(sys.stdout)
+    _console_handler.setLevel(logging.INFO)
+    _formatter = logging.Formatter(
+        "%(asctime)s [%(levelname)s] [InboxConsumer] %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+    _console_handler.setFormatter(_formatter)
+    logger.addHandler(_console_handler)
 
 
 class InboxConsumerWorker:

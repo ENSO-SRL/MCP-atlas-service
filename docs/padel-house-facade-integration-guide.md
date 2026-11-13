@@ -174,14 +174,16 @@ sequenceDiagram
     participant PBP as API PlayByPoint (Padel House)
 
     Claude->>MCP: create_booking_request(slot_token, booking_fields={"users": [...]})
-    MCP->>MCP: Valida HMAC-SHA256, expiración y booking_fields_schema
-    MCP->>Redis: SETNX hold:slot:16:{resource_id}:{start_time} EX 900
-    MCP->>Redis: RPUSH queue:booking:requests
-    MCP-->>Claude: BookingRequestDTO (status="pending", request_id)
-    Facade->>Redis: BLPOP queue:booking:requests
+    MCP->>MCP: Valida slot_token y esquema de campos (booking_fields_schema)
+    MCP->>Redis: Adquiere hold atómico en Redis (hold:{offer_ref})
+    MCP->>DB: Guarda BookingRequest (REQUESTED) y registra Outbox (BookingRequested) [ACID]
+    MCP-->>Claude: BookingCreationResultDTO (status="requested", booking_id)
+    Worker->>DB: Lee evento de Outbox (mcp.outbox_event)
+    Worker->>Redis: XADD stream:booking:events (BookingRequested)
+    Facade->>Redis: XREADGROUP stream:booking:events
     Facade->>PBP: POST /bookings (Cancha + 4 Jugadores)
     PBP-->>Facade: 200 OK (Payment Link generado)
-    Facade->>Redis: PUBLISH booking:events {"event": "confirmed", "payment_url": "..."}
+    Facade->>Redis: XADD stream:booking:results (BookingConfirmed, payment_url)
 ```
 
 ---
@@ -203,7 +205,7 @@ Padel House exige exactamente **3 jugadores acompañantes** (el usuario autentic
 
 ---
 
-### 3.2 Mensaje que Recibe el Facade (`queue:booking:requests`)
+### 3.2 Mensaje que Recibe el Facade (`stream:booking:events`)
 
 ```json
 {

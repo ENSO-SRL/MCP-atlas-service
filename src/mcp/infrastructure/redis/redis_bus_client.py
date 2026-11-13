@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import logging
+import sys
 from datetime import datetime, timezone
 from typing import Any, Optional
 from redis.asyncio import Redis
@@ -8,6 +10,14 @@ from redis.asyncio import Redis
 from src.mcp.domain.ports.mcp_ports import IRedisBusClient
 from src.shared.config.settings import get_settings
 from src.shared.redis.client import get_redis_client
+
+logger = logging.getLogger("mcp.redis_bus")
+logger.setLevel(logging.INFO)
+if not logger.handlers:
+    _sh = logging.StreamHandler(sys.stdout)
+    _sh.setLevel(logging.INFO)
+    _sh.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] [RedisBusClient] %(message)s", datefmt="%Y-%m-%d %H:%M:%S"))
+    logger.addHandler(_sh)
 
 
 class RedisBusClient(IRedisBusClient):
@@ -189,6 +199,14 @@ class RedisBusClient(IRedisBusClient):
         Publica un evento transaccional en un stream de Redis (XADD).
         Retorna el id generado por Redis (ej. '1729965600000-0').
         """
-        fields = {"payload": json.dumps(payload, ensure_ascii=False)}
+        raw_json = json.dumps(payload, ensure_ascii=False)
+        fields = {"payload": raw_json}
         msg_id = await self._redis.xadd(stream_name, fields)
+        logger.info(
+            "XADD exitoso en stream '%s' -> redis_msg_id: %s (payload_bytes=%d)",
+            stream_name,
+            msg_id,
+            len(raw_json),
+        )
+        sys.stdout.flush()
         return str(msg_id)

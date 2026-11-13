@@ -1,13 +1,23 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import sys
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 # Asegurar que el directorio raíz del proyecto esté en sys.path al invocar python src/main.py
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+
+# Configuración global del logging en consola con flush inmediato
+logging.basicConfig(
+    stream=sys.stdout,
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
 
 import jwt
 from fastapi import FastAPI, Request
@@ -16,6 +26,7 @@ from fastapi.responses import JSONResponse
 from mcp.server.sse import TransportSecuritySettings
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from src.mcp.infrastructure.workers import InboxConsumerWorker, OutboxRelayWorker
 from src.mcp.presentation.server import mcp_server
 from src.oauth.presentation.app import create_oauth_app
 from src.shared.config.settings import get_settings
@@ -88,16 +99,46 @@ class MCPAuthMiddleware:
         await self.app(scope, receive, send)
 
 
+@asynccontextmanager
+async def app_lifespan(app: FastAPI):
+    """
+    Ciclo de vida ASGI (Lifespan) que gestiona los background workers de Atlas:
+    - OutboxRelayWorker: retransmite mcp.outbox_event -> Redis Stream 'stream:booking:events'
+    - InboxConsumerWorker: consume Redis Stream 'stream:booking:results' -> actualiza mcp.booking_request
+    """
+    stop_event = asyncio.Event()
+    outbox_worker = OutboxRelayWorker()
+    inbox_worker = InboxConsumerWorker()
+
+    logger.info("Iniciando background workers (OutboxRelayWorker e InboxConsumerWorker)...")
+    outbox_task = asyncio.create_task(outbox_worker.run_forever(stop_event=stop_event))
+    inbox_task = asyncio.create_task(inbox_worker.run_forever(stop_event=stop_event))
+    logger.info("Background workers activos en segundo plano.")
+
+    yield
+
+    logger.info("Deteniendo background workers...")
+    stop_event.set()
+    outbox_task.cancel()
+    inbox_task.cancel()
+    try:
+        await asyncio.gather(outbox_task, inbox_task, return_exceptions=True)
+    except Exception:
+        pass
+    logger.info("Background workers detenidos exitosamente.")
+
+
 def create_unified_app() -> FastAPI:
     """
     Crea la aplicación ASGI unificada que combina:
       1. Servidor de Autorización OAuth 2.0 (RFC 6749, RFC 7636, RFC 8414, RFC 9470).
       2. Servidor MCP sobre Server-Sent Events (SSE) y HTTP (/sse, /messages/).
+      3. Background workers para Outbox / Inbox.
     """
     settings = get_settings()
 
-    # 1. Base FastAPI con todas las rutas OAuth y páginas Jinja2
-    app = create_oauth_app()
+    # 1. Base FastAPI con todas las rutas OAuth, UI y Lifespan de workers
+    app = create_oauth_app(lifespan=app_lifespan)
 
     # 2. Middleware de autenticación obligatoria para MCP (/sse y /messages/)
     app.add_middleware(MCPAuthMiddleware)
@@ -160,4 +201,3 @@ if __name__ == "__main__":
         port=settings.PORT,
         reload=settings.DEBUG,
     )
-
